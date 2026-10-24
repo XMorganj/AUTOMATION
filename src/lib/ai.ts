@@ -7,6 +7,18 @@ interface GenerateOptions {
 }
 
 /**
+ * Custom AI Error class for handling status codes and errors.
+ */
+export class AiError extends Error {
+  status: number;
+  constructor(message: string, status: number = 500) {
+    super(message);
+    this.name = 'AiError';
+    this.status = status;
+  }
+}
+
+/**
  * Checks if the required API key or configuration exists for the active provider.
  */
 export function hasKey(provider?: string): boolean {
@@ -18,34 +30,41 @@ export function hasKey(provider?: string): boolean {
 }
 
 /**
- * Extracts and parses JSON from raw AI text responses (handles markdown blocks or raw strings).
+ * Extracts and parses JSON from raw AI text responses.
  */
 export function extractJson(text: string): any {
   try {
     return JSON.parse(text);
   } catch (e) {
-    // Look for markdown json code block
     const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (match && match[1]) {
       try {
         return JSON.parse(match[1]);
-      } catch (err) {
-        // continue
-      }
+      } catch (err) {}
     }
-    // Fallback: find first { and last }
     const firstBrace = text.indexOf('{');
     const lastBrace = text.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
       try {
         return JSON.parse(text.substring(firstBrace, lastBrace + 1));
-      } catch (err) {
-        // continue
-      }
+      } catch (err) {}
     }
-    throw new Error('Failed to extract valid JSON from AI response');
+    throw new AiError('Failed to extract valid JSON from AI response');
   }
 }
+
+/**
+ * Claude client export to satisfy direct imports from API routes.
+ */
+export const claude = {
+  messages: {
+    create: async (params: { model?: string; max_tokens?: number; system?: string; messages: Array<{role: string, content: string}> }) => {
+      const prompt = params.messages.map(m => m.content).join('\n');
+      const text = await callAnthropic(prompt, params.system);
+      return { content: [{ text }] };
+    }
+  }
+};
 
 export async function generateAIContent({ prompt, systemPrompt, provider }: GenerateOptions): Promise<string> {
   const activeProvider = provider || process.env.DEFAULT_AI_PROVIDER || 'ollama';
@@ -62,7 +81,7 @@ async function callAnthropic(prompt: string, systemPrompt?: string): Promise<str
   const apiKey = process.env.ANTHROPIC_API_KEY;
   
   if (!apiKey) {
-    throw new Error('Anthropic API key is missing. Please set ANTHROPIC_API_KEY or switch provider to ollama.');
+    throw new AiError('Anthropic API key is missing. Please set ANTHROPIC_API_KEY or switch provider to ollama.', 400);
   }
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -82,7 +101,7 @@ async function callAnthropic(prompt: string, systemPrompt?: string): Promise<str
 
   if (!response.ok) {
     const errorData = await response.text();
-    throw new Error(`Anthropic API error: ${errorData}`);
+    throw new AiError(`Anthropic API error: ${errorData}`, response.status);
   }
 
   const data = await response.json();
@@ -100,7 +119,7 @@ async function callOllama(prompt: string, systemPrompt?: string): Promise<string
     method: 'POST',
     headers: { 
       'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true' // Bypasses ngrok's interstitial warning page
+      'ngrok-skip-browser-warning': 'true' // Bypasses ngrok warning page
     },
     body: JSON.stringify({
       model: model,
@@ -111,7 +130,7 @@ async function callOllama(prompt: string, systemPrompt?: string): Promise<string
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Failed to connect to local Ollama via ngrok: ${errorText}`);
+    throw new AiError(`Failed to connect to local Ollama via ngrok: ${errorText}`, response.status);
   }
 
   const data = await response.json();
