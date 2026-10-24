@@ -25,7 +25,8 @@ npm run dev                  # http://localhost:3000
 | 6. Motion (per-shot zoom/pan, live preview, intensity, shuffle) | Done |
 | 7. Voiceover (ElevenLabs voices, models, delivery presets, per-shot redo, credit estimate, background music) | Done |
 | 8. Render (FFmpeg: zoom/pan motion, word-by-word captions, music ducking, 720p/1080p/4K, 24/30 fps) | Done |
-| 9–10 Title & SEO, Upload | Next |
+| 9. Title & SEO (5 title options, description, tags, hashtags, exact chapter timestamps, thumbnail maker, checklist) | Done |
+| 10. Upload | Next |
 | Publish, Shorts, Calendar, Channels, YouTube | Next |
 
 ## Needs
@@ -49,3 +50,5 @@ npm run dev                  # http://localhost:3000
 - Generating narration spends ElevenLabs characters, so the app shows the character count and your remaining balance and asks first.
 - Rendering makes one clip per shot (zoom/pan with the same easing as the preview, captions burned in), then joins them without re-encoding and mixes narration + music. Only one render runs at a time, and a new render never replaces your last good video until it finishes. The finished file is in `data/videos/<id>/render/video.mp4`.
 - The Render screen marks a finished video "out of date" if you change the settings, motion, images, narration or music after rendering.
+- Chapter timestamps come from the narration lengths using the same frame maths as the renderer, so they match the finished video. YouTube needs at least 3 chapters, the first at 0:00, each 10 seconds or longer; chapters that break that are merged or dropped.
+- The thumbnail is drawn in your browser (1280×720 JPEG under 2 MB) and saved to `data/videos/<id>/thumbnail.jpg` for the Upload step. YouTube rejects `<` and `>` in titles, descriptions and tags, so those are removed.
