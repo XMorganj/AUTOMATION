@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { STEP_IDS, type StepId, type StepStatus } from "./pipeline";
 import type { Intensity, MotionId } from "./motion";
+import type { VoiceChoice } from "./voice";
 
 export interface Idea {
   title: string;
@@ -50,6 +51,9 @@ export interface Video {
   shots?: Shot[];
   /** hash of the script the shots were built from */
   shotsScriptHash?: string;
+  voice?: VoiceChoice;
+  /** background music mix settings; the file itself lives on disk */
+  music?: { volume: number; duck: boolean };
   motionIntensity?: Intensity;
   /** seeds the automatic motion pattern; "Shuffle" picks a new one */
   motionSeed?: number;

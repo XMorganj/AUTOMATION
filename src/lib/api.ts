@@ -1,6 +1,17 @@
 "use client";
 
-/** POST JSON to one of our API routes and return the parsed body, or throw an Error with a readable message. */
+/** An error from one of our API routes, with the HTTP status and (when the route sends one) a machine-readable code. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code?: string,
+  ) {
+    super(message);
+  }
+}
+
+/** POST JSON to one of our API routes and return the parsed body, or throw an ApiError with a readable message. */
 export async function postJson<T>(url: string, body: unknown): Promise<T> {
   let res: Response;
   try {
@@ -10,7 +21,7 @@ export async function postJson<T>(url: string, body: unknown): Promise<T> {
       body: JSON.stringify(body),
     });
   } catch {
-    throw new Error("Couldn't reach the server. Check that the app is still running.");
+    throw new ApiError("Couldn't reach the server. Check that the app is still running.", 0, "network");
   }
   let data: unknown = null;
   try {
@@ -19,8 +30,8 @@ export async function postJson<T>(url: string, body: unknown): Promise<T> {
     /* non-JSON error body */
   }
   if (!res.ok) {
-    const msg = (data as { error?: string } | null)?.error;
-    throw new Error(msg || `Something went wrong (${res.status}).`);
+    const d = data as { error?: string; code?: string } | null;
+    throw new ApiError(d?.error || `Something went wrong (${res.status}).`, res.status, d?.code);
   }
   return data as T;
 }
