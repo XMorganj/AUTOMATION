@@ -9,7 +9,7 @@ interface GenerateOptions {
 /**
  * Custom AI Error class for handling status codes and errors.
  */
-export class AiError extends Error {
+class AiError extends Error {
   status: number;
   constructor(message: string, status: number = 500) {
     super(message);
@@ -30,23 +30,23 @@ export function hasKey(provider?: string): boolean {
 }
 
 /**
- * Extracts and parses JSON from raw AI text responses.
+ * Extracts and parses JSON with generic typing support to prevent implicit any errors.
  */
-export function extractJson(text: string): any {
+export function extractJson<T = any>(text: string): T {
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) as T;
   } catch (e) {
     const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (match && match[1]) {
       try {
-        return JSON.parse(match[1]);
+        return JSON.parse(match[1]) as T;
       } catch (err) {}
     }
     const firstBrace = text.indexOf('{');
     const lastBrace = text.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
       try {
-        return JSON.parse(text.substring(firstBrace, lastBrace + 1));
+        return JSON.parse(text.substring(firstBrace, lastBrace + 1)) as T;
       } catch (err) {}
     }
     throw new AiError('Failed to extract valid JSON from AI response');
@@ -54,11 +54,16 @@ export function extractJson(text: string): any {
 }
 
 /**
- * Claude client export to satisfy direct imports from API routes.
+ * Claude client export with generic type support for messages.create.
  */
 export const claude = {
   messages: {
-    create: async (params: { model?: string; max_tokens?: number; system?: string; messages: Array<{role: string, content: string}> }) => {
+    create: async <T = any>(params: { 
+      model?: string; 
+      max_tokens?: number; 
+      system?: string; 
+      messages: Array<{role: string, content: string}> 
+    }): Promise<{ content: [{ text: string }] }> => {
       const prompt = params.messages.map(m => m.content).join('\n');
       const text = await callAnthropic(prompt, params.system);
       return { content: [{ text }] };
