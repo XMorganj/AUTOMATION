@@ -124,6 +124,8 @@ async function callOllama(prompt: string, systemPrompt?: string): Promise<string
   const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
   const model = process.env.OLLAMA_MODEL || 'huihui_ai/dolphin3-abliterated:8b-llama3.1-q4_K_M';
 
+  console.log(`[AI Provider] Connecting to Ollama at URL: ${baseUrl} using model: ${model}`);
+
   const fullPrompt = systemPrompt ? `${systemPrompt}\n\nUser: ${prompt}` : prompt;
 
   const response = await fetch(`${baseUrl}/api/chat`, {
@@ -141,7 +143,7 @@ async function callOllama(prompt: string, systemPrompt?: string): Promise<string
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new AiError(`Failed to connect to local Ollama via ngrok: ${errorText}`, response.status);
+    throw new AiError(`Failed to connect to local Ollama via ngrok (${baseUrl}): ${errorText}`, response.status);
   }
 
   const data = await response.json();
