@@ -9,7 +9,91 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const MAX_SHOTS_PER_CALL = 25;
+const MAX_SHOTS_PER_CALL =// Check Ollama configuration
+  if (!hasKey("ollama")) {
+    return NextResponse.json(
+      {
+        error: "Ollama is not configured. Set OLLAMA_BASE_URL.",
+      },
+      { status: 503 }
+    );
+  }
+
+  const list = shots
+    .map((s) => `${s.n}. ${s.narration}`)
+    .join("\n");
+
+  const prompt = `
+You write image-generation prompts for a YouTube video titled "${title}".
+
+Video opening:
+"""
+${outline}
+"""
+
+Locked art style:
+"""
+${artStyle}
+"""
+
+Write one image prompt for each numbered narration segment.
+
+Each prompt must:
+- Describe a clear visual scene.
+- Maintain the same art style.
+- Keep recurring characters visually consistent.
+- Include setting, action, mood, and lighting.
+- Be 2 to 4 sentences long.
+- End with "16:9 widescreen. No text, no captions, no watermark."
+
+Narration segments:
+${list}
+
+Return ONLY a valid JSON array containing exactly ${shots.length} strings.
+No markdown, explanations, or code fences.
+`;
+
+  try {
+    const text = await generateAIContent({
+      prompt,
+      systemPrompt:
+        "You are an expert cinematic image prompt engineer. Return only valid JSON arrays.",
+      provider: "ollama",
+    });
+
+    const arr = extractJson<unknown[]>(text);
+
+    if (
+      !Array.isArray(arr) ||
+      arr.length !== shots.length ||
+      arr.some(
+        (p) => typeof p !== "string" || !p.trim()
+      )
+    ) {
+      throw new AiError(
+        "The AI returned the wrong number of prompts. Try again."
+      );
+    }
+
+    return NextResponse.json({
+      mock: false,
+      prompts: (arr as string[]).map((p) => p.trim()),
+    });
+
+  } catch (err) {
+    console.error("Prompts route failed:", err);
+
+    const e =
+      err instanceof AiError
+        ? err
+        : new AiError("Couldn't write the prompts. Try again.");
+
+    return NextResponse.json(
+      { error: e.message },
+      { status: e.status }
+    );
+  }
+} 25;
 
 interface Shot {
   n: number;
