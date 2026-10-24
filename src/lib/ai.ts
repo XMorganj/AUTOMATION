@@ -7,7 +7,7 @@ interface GenerateOptions {
 }
 
 /**
- * Custom AI Error class for handling status codes and errors.
+ * Custom AiError class for handling status codes and errors.
  */
 export class AiError extends Error {
   status: number;
@@ -30,31 +30,34 @@ export function hasKey(provider?: string): boolean {
 }
 
 /**
- * Extracts and parses JSON with generic typing support.
+ * Ultra-resilient JSON extractor handling arrays, objects, and markdown wrappers.
  */
 export function extractJson<T = any>(text: string): T {
   try {
     return JSON.parse(text) as T;
   } catch (e) {
-    const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (match && match[1]) {
+    // Strip markdown code blocks if present
+    const cleaned = text.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
+    try {
+      return JSON.parse(cleaned) as T;
+    } catch (err) {}
+
+    // Find the first opening bracket/brace and last closing bracket/brace
+    const firstMatch = cleaned.search(/[\{\[]/);
+    const lastMatch = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
+    
+    if (firstMatch !== -1 && lastMatch !== -1 && lastMatch > firstMatch) {
       try {
-        return JSON.parse(match[1]) as T;
+        return JSON.parse(cleaned.substring(firstMatch, lastMatch + 1)) as T;
       } catch (err) {}
     }
-    const firstBrace = text.indexOf('{');
-    const lastBrace = text.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      try {
-        return JSON.parse(text.substring(firstBrace, lastBrace + 1)) as T;
-      } catch (err) {}
-    }
-    throw new AiError('Failed to extract valid JSON from AI response');
+
+    throw new AiError(`Failed to extract valid JSON from AI response: ${text.substring(0, 100)}...`);
   }
 }
 
 /**
- * Bulletproof Claude client export using rest parameters to accept any arguments or generics.
+ * Bulletproof Claude client export using rest parameters.
  */
 export const claude = {
   messages: {
@@ -68,7 +71,7 @@ export const claude = {
         prompt = typeof params === 'string' ? params : JSON.stringify(params);
       }
       
-      const systemPrompt = params.system || 'You are an expert YouTube scriptwriter specializing in dark history and mystery content.';
+      const systemPrompt = params.system || 'You are an expert YouTube scriptwriter specializing in dark history and mystery content. Output valid JSON only.';
       const text = await callAnthropic(prompt, systemPrompt);
       return { content: [{ text }] };
     }
@@ -128,7 +131,7 @@ async function callOllama(prompt: string, systemPrompt?: string): Promise<string
     method: 'POST',
     headers: { 
       'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true' // Bypasses ngrok warning page
+      'ngrok-skip-browser-warning': 'true' 
     },
     body: JSON.stringify({
       model: model,
