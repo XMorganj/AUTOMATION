@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!hasKey("ollama")) {
+  if (!hasKey()) {
     return NextResponse.json(
       {
         error:
@@ -138,7 +138,7 @@ Expected format:
       prompt,
       systemPrompt:
         "You are an expert historical and scientific fact-checker. Return only valid JSON.",
-      provider: "ollama",
+      maxTokens: 6000,
     });
 
     const raw = extractJson<FactCheckResult>(text);

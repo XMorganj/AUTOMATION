@@ -72,7 +72,7 @@ export async function POST(req: Request) {
       : 10;
 
   // Check whether Ollama is configured
-  if (!hasKey("ollama")) {
+  if (!hasKey()) {
     return NextResponse.json({
       ideas: mockIdeas(theme),
       mock: true,
@@ -122,7 +122,7 @@ Expected format:
       prompt,
       systemPrompt:
         "You are an expert YouTube strategist. Return only valid JSON arrays.",
-      provider: "ollama",
+      maxTokens: 1200,
     });
 
     // Parse JSON response

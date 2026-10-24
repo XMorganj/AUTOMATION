@@ -1,151 +1,132 @@
-// src/lib/ai.ts
-
-interface GenerateOptions {
-  prompt: string;
-  systemPrompt?: string;
-  provider?: 'anthropic' | 'ollama';
-}
+import "server-only";
 
 /**
- * Custom AiError class for handling status codes and errors.
+ * Text generation for ideas, scripts, fact checks and image prompts. Server-side only: keys never reach the browser.
+ *
+ * Provider is chosen by DEFAULT_AI_PROVIDER ("ollama" by default, or "anthropic"):
+ *  - ollama:    a local model, reached at OLLAMA_BASE_URL (works through an ngrok URL too). OLLAMA_MODEL, OLLAMA_NUM_CTX.
+ *  - anthropic: Claude, with ANTHROPIC_API_KEY. ANTHROPIC_MODEL and ANTHROPIC_BASE_URL are optional.
  */
+
+export type Provider = "anthropic" | "ollama";
+
+export interface GenerateOptions {
+  prompt: string;
+  systemPrompt?: string;
+  /** overrides DEFAULT_AI_PROVIDER for this call */
+  provider?: Provider;
+  /** the most the model may write; keeps long scripts from being cut off, and short jobs from rambling */
+  maxTokens?: number;
+}
+
 export class AiError extends Error {
   status: number;
-  constructor(message: string, status: number = 500) {
+  constructor(message: string, status: number = 502) {
     super(message);
-    this.name = 'AiError';
+    this.name = "AiError";
     this.status = status;
   }
 }
 
-/**
- * Checks if the required API key or configuration exists for the active provider.
- */
-export function hasKey(provider?: string): boolean {
-  const activeProvider = provider || process.env.DEFAULT_AI_PROVIDER || 'ollama';
-  if (activeProvider === 'anthropic') {
-    return !!process.env.ANTHROPIC_API_KEY;
-  }
-  return !!process.env.OLLAMA_BASE_URL || true;
+export function activeProvider(provider?: string): Provider {
+  const p = (provider || process.env.DEFAULT_AI_PROVIDER || "ollama").toLowerCase();
+  return p === "anthropic" ? "anthropic" : "ollama";
 }
 
-/**
- * Ultra-resilient JSON extractor handling arrays, objects, and markdown wrappers.
- */
-export function extractJson<T = any>(text: string): T {
+/** Is the chosen provider set up? Ollama needs a URL (OLLAMA_BASE_URL, or a local default); Claude needs a key. */
+export function hasKey(provider?: string): boolean {
+  return activeProvider(provider) === "anthropic" ? Boolean(process.env.ANTHROPIC_API_KEY) : true;
+}
+
+/** Pull JSON out of a model reply, even when it is wrapped in markdown fences or has chatter around it. */
+export function extractJson<T = unknown>(text: string): T {
   try {
     return JSON.parse(text) as T;
-  } catch (e) {
-    const cleaned = text.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
+  } catch {
+    /* try the cleaned-up versions below */
+  }
+  const cleaned = text.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, "$1").trim();
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    /* fall through */
+  }
+  const first = cleaned.search(/[{[]/);
+  const last = Math.max(cleaned.lastIndexOf("}"), cleaned.lastIndexOf("]"));
+  if (first !== -1 && last > first) {
     try {
-      return JSON.parse(cleaned) as T;
-    } catch (err) {}
-
-    const firstMatch = cleaned.search(/[\{\[]/);
-    const lastMatch = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
-    
-    if (firstMatch !== -1 && lastMatch !== -1 && lastMatch > firstMatch) {
-      try {
-        return JSON.parse(cleaned.substring(firstMatch, lastMatch + 1)) as T;
-      } catch (err) {}
-    }
-
-    throw new AiError(`Failed to extract valid JSON from AI response: ${text.substring(0, 100)}...`);
-  }
-}
-
-/**
- * Claude client export that delegates to generateAIContent (respecting local Ollama/ngrok).
- */
-export const claude = {
-  messages: {
-    create: async (...args: any[]): Promise<{ content: [{ text: string }] }> => {
-      const params = args[0] || {};
-      let prompt = '';
-      
-      if (params.messages && Array.isArray(params.messages)) {
-        prompt = params.messages.map((m: any) => m.content).join('\n');
-      } else {
-        prompt = typeof params === 'string' ? params : JSON.stringify(params);
-      }
-      
-      const systemPrompt = params.system || 'You are an expert YouTube scriptwriter specializing in dark history and mystery content. Output valid JSON only.';
-      
-      const text = await generateAIContent({ prompt, systemPrompt });
-      return { content: [{ text }] };
+      return JSON.parse(cleaned.slice(first, last + 1)) as T;
+    } catch {
+      /* fall through */
     }
   }
-};
-
-export async function generateAIContent({ prompt, systemPrompt, provider }: GenerateOptions): Promise<string> {
-  const activeProvider = provider || process.env.DEFAULT_AI_PROVIDER || 'ollama';
-
-  if (activeProvider === 'anthropic') {
-    return await callAnthropic(prompt, systemPrompt);
-  } else {
-    return await callOllama(prompt, systemPrompt);
-  }
+  throw new AiError(`The AI's reply wasn't in the expected format. Try again. (${text.slice(0, 80).replace(/\s+/g, " ")}…)`);
 }
 
-// 1. Anthropic Handler
-async function callAnthropic(prompt: string, systemPrompt?: string): Promise<string> {
+export async function generateAIContent(opts: GenerateOptions): Promise<string> {
+  return activeProvider(opts.provider) === "anthropic" ? callAnthropic(opts) : callOllama(opts);
+}
+
+async function callAnthropic({ prompt, systemPrompt, maxTokens }: GenerateOptions): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  
-  if (!apiKey) {
-    throw new AiError('Anthropic API key is missing. Please set ANTHROPIC_API_KEY or switch provider to ollama.', 400);
+  if (!apiKey) throw new AiError("ANTHROPIC_API_KEY isn't set. Add it to .env.local, or set DEFAULT_AI_PROVIDER=ollama.", 400);
+  const base = (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com").replace(/\/+$/, "");
+
+  let res: Response;
+  try {
+    res = await fetch(`${base}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
+        max_tokens: maxTokens ?? 4096,
+        ...(systemPrompt ? { system: systemPrompt } : {}),
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+  } catch {
+    throw new AiError("Couldn't reach the Anthropic API. Check your internet connection.", 502);
   }
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 2048,
-      system: systemPrompt || 'You are an expert YouTube scriptwriter specializing in dark history and mystery content.',
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.text();
-    throw new AiError(`Anthropic API error: ${errorData}`, response.status);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new AiError(`The AI service returned ${res.status}. ${body.slice(0, 160)}`.trim(), res.status === 429 || res.status === 401 ? res.status : 502);
   }
-
-  const data = await response.json();
-  return data.content[0].text;
+  const data = (await res.json()) as { content?: { type: string; text?: string }[] };
+  const text = (data.content ?? []).filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
+  if (!text.trim()) throw new AiError("The AI returned an empty reply. Try again.", 502);
+  return text;
 }
 
-// 2. Ollama Local Handler (via Ngrok)
-async function callOllama(prompt: string, systemPrompt?: string): Promise<string> {
-  const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-  const model = process.env.OLLAMA_MODEL || 'huihui_ai/dolphin3-abliterated:8b-llama3.1-q4_K_M';
+async function callOllama({ prompt, systemPrompt, maxTokens }: GenerateOptions): Promise<string> {
+  const base = (process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/+$/, "");
+  const model = process.env.OLLAMA_MODEL || "huihui_ai/dolphin3-abliterated:8b-llama3.1-q4_K_M";
+  // Ollama reads only the first 2-4k tokens by default and quietly drops the rest, which would cut off long scripts
+  const numCtx = Number(process.env.OLLAMA_NUM_CTX) || 16384;
 
-  console.log(`[AI Provider] Connecting to Ollama at URL: ${baseUrl} using model: ${model}`);
-
-  const fullPrompt = systemPrompt ? `${systemPrompt}\n\nUser: ${prompt}` : prompt;
-
-  const response = await fetch(`${baseUrl}/api/chat`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true' 
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [{ role: 'user', content: fullPrompt }],
-      stream: false,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new AiError(`Failed to connect to local Ollama via ngrok (${baseUrl}): ${errorText}`, response.status);
+  let res: Response;
+  try {
+    res = await fetch(`${base}/api/chat`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "ngrok-skip-browser-warning": "true" },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        messages: [
+          ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
+          { role: "user", content: prompt },
+        ],
+        options: { num_ctx: numCtx, ...(maxTokens ? { num_predict: maxTokens } : {}) },
+      }),
+    });
+  } catch {
+    throw new AiError(`Couldn't reach Ollama at ${base}. Is it running (and the ngrok link still live)?`, 502);
   }
-
-  const data = await response.json();
-  return data.message.content;
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new AiError(`Ollama returned ${res.status}. ${body.slice(0, 160)}`.trim(), 502);
+  }
+  const data = (await res.json()) as { message?: { content?: string } };
+  const text = data.message?.content ?? "";
+  if (!text.trim()) throw new AiError("The AI returned an empty reply. Try again.", 502);
+  return text;
 }
