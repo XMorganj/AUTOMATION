@@ -37,7 +37,7 @@ export function dataRoot(): string {
   return path.resolve(process.env.STUDIO_DATA_DIR || path.join(process.cwd(), "data"));
 }
 
-function videoDir(id: string): string {
+export function videoDir(id: string): string {
   return path.join(dataRoot(), "videos", id);
 }
 

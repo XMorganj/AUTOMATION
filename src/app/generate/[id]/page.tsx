@@ -11,6 +11,7 @@ import { FactCheckStep } from "@/components/steps/FactCheckStep";
 import { PromptsStep } from "@/components/steps/PromptsStep";
 import { ImagesStep } from "@/components/steps/ImagesStep";
 import { MotionStep } from "@/components/steps/MotionStep";
+import { VoiceStep } from "@/components/steps/VoiceStep";
 
 export default function VideoPage() {
   const { id } = useParams<{ id: string }>();
@@ -62,6 +63,8 @@ export default function VideoPage() {
           <ImagesStep video={video} />
         ) : step.id === "motion" ? (
           <MotionStep video={video} />
+        ) : step.id === "voice" ? (
+          <VoiceStep video={video} />
         ) : (
           <div className="rounded-2xl border border-dashed p-6 text-sm text-[var(--text-muted)]" style={{ borderColor: "var(--border-strong)" }}>
             This step is next on the build list. The pipeline, saved state and navigation already work, so it will
