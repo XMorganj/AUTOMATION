@@ -54,27 +54,22 @@ export function extractJson<T = any>(text: string): T {
 }
 
 /**
- * Claude client export supporting multiple generic arguments and optional request options.
+ * Bulletproof Claude client export using rest parameters to accept any arguments or generics.
  */
 export const claude = {
   messages: {
-    create: async <T = any, U = any, V = any>(
-      params: { 
-        model?: string; 
-        max_tokens?: number; 
-        system?: string; 
-        messages?: Array<{role: string, content: string}>;
-        [key: string]: any; 
-      }, 
-      options?: any
-    ): Promise<{ content: [{ text: string }] }> => {
+    create: async (...args: any[]): Promise<{ content: [{ text: string }] }> => {
+      const params = args[0] || {};
       let prompt = '';
+      
       if (params.messages && Array.isArray(params.messages)) {
-        prompt = params.messages.map(m => m.content).join('\n');
+        prompt = params.messages.map((m: any) => m.content).join('\n');
       } else {
-        prompt = JSON.stringify(params);
+        prompt = typeof params === 'string' ? params : JSON.stringify(params);
       }
-      const text = await callAnthropic(prompt, params.system);
+      
+      const systemPrompt = params.system || 'You are an expert YouTube scriptwriter specializing in dark history and mystery content.';
+      const text = await callAnthropic(prompt, systemPrompt);
       return { content: [{ text }] };
     }
   }
