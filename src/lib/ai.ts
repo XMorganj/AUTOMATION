@@ -9,7 +9,7 @@ interface GenerateOptions {
 /**
  * Custom AiError class for handling status codes and errors.
  */
-export class AiError extends Error {
+public class AiError extends Error {
   status: number;
   constructor(message: string, status: number = 500) {
     super(message);
@@ -36,13 +36,11 @@ export function extractJson<T = any>(text: string): T {
   try {
     return JSON.parse(text) as T;
   } catch (e) {
-    // Strip markdown code blocks if present
     const cleaned = text.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
     try {
       return JSON.parse(cleaned) as T;
     } catch (err) {}
 
-    // Find the first opening bracket/brace and last closing bracket/brace
     const firstMatch = cleaned.search(/[\{\[]/);
     const lastMatch = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
     
@@ -57,7 +55,7 @@ export function extractJson<T = any>(text: string): T {
 }
 
 /**
- * Bulletproof Claude client export using rest parameters.
+ * Claude client export that delegates to generateAIContent (respecting local Ollama/ngrok).
  */
 export const claude = {
   messages: {
@@ -72,7 +70,9 @@ export const claude = {
       }
       
       const systemPrompt = params.system || 'You are an expert YouTube scriptwriter specializing in dark history and mystery content. Output valid JSON only.';
-      const text = await callAnthropic(prompt, systemPrompt);
+      
+      // Use generateAIContent so it respects DEFAULT_AI_PROVIDER=ollama & hits ngrok
+      const text = await generateAIContent({ prompt, systemPrompt });
       return { content: [{ text }] };
     }
   }
