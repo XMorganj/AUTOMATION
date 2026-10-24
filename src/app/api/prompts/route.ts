@@ -139,7 +139,7 @@ Do not include explanations or code fences.
       prompt,
       systemPrompt:
         "You are an expert cinematic image prompt engineer. Return only valid JSON arrays.",
-      provider: "ollama",
+      maxTokens: Math.min(16_000, shots.length * 260 + 400),
     });
 
     const arr = extractJson<unknown[]>(text);

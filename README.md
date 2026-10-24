@@ -40,9 +40,9 @@ npm run dev                  # http://localhost:3000
 - Generated media is written to disk (`STUDIO_DATA_DIR`), so host it somewhere with a persistent disk. Serverless hosts with a read-only or temporary filesystem will not keep images or narration.
 - Motion is defined once in `src/lib/motion.ts` and used by both the preview and (later) the render, so what you preview is what you get.
 - Name image files with their shot number (001.png, 002.png …) to land them on the right shot. Other names are matched in name order.
-- With no `ANTHROPIC_API_KEY`, every AI route returns clearly-labelled placeholder content so you can click through the app.
+- The writing steps use a local Ollama model by default (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`); set `DEFAULT_AI_PROVIDER=anthropic` plus `ANTHROPIC_API_KEY` to use Claude instead. Ollama's default context window is small and silently drops the end of long scripts, so the app asks for `OLLAMA_NUM_CTX` (16384) tokens. If Claude is chosen with no key, the routes return clearly-labelled placeholder content.
 - The fact check uses the AI's own knowledge, not live web sources. Confirm dates, numbers, quotes and scripture against a real source before publishing.
-- `ANTHROPIC_BASE_URL` can point the app at a proxy or a test server. It defaults to the official API.
+- `ANTHROPIC_BASE_URL` can point the Claude calls at a proxy or a test server.
 - When you edit the script after a later step was made, that step shows an "out of date" notice.
 - Without `ELEVENLABS_API_KEY` the Voiceover step runs in demo mode: silent placeholder audio with realistic timing, so the rest of the pipeline can be tried.
 - Narration is made one shot at a time, so redoing a single shot is cheap and each shot has an exact duration. Word-level timings from ElevenLabs are saved for the captions in the Render step.

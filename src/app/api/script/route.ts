@@ -66,7 +66,7 @@ export async function POST(req: Request) {
   const words = Math.round(minutes * WORDS_PER_MIN);
 
   // Check whether Ollama is configured
-  if (!hasKey("ollama")) {
+  if (!hasKey()) {
     return NextResponse.json({
       script: mockScript(title, words),
       mock: true,
@@ -147,7 +147,7 @@ ${rules}
       prompt,
       systemPrompt:
         "You are an expert YouTube documentary scriptwriter. Write engaging, accurate, natural narration.",
-      provider: "ollama",
+      maxTokens: Math.min(16_000, Math.round(words * 1.8) + 600),
     });
 
     if (!text || !text.trim()) {
