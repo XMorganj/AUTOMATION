@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useRef } from "react";
 import { Check, Play, Shuffle } from "lucide-react";
-import { INTENSITIES, MOTIONS, autoMotion, motionPath, seedFromId, viewTransform, type Intensity, type MotionId } from "@/lib/motion";
+import { EASE_CSS, INTENSITIES, MOTIONS, autoMotion, motionPath, seedFromId, viewTransform, type Intensity, type MotionId } from "@/lib/motion";
 import { WORDS_PER_MIN } from "@/lib/pipeline";
 import { countWords } from "@/lib/shots";
 import { useStoredImages } from "@/lib/useStoredImages";
@@ -152,7 +152,7 @@ const ShotCard = memo(function ShotCard({
     stop();
     anim.current = el.animate([{ transform: viewTransform(from) }, { transform: viewTransform(to) }], {
       duration: seconds * 1000,
-      easing: "ease-in-out",
+      easing: EASE_CSS,
       fill: "forwards",
     });
   };

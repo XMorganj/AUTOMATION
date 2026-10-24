@@ -31,6 +31,16 @@ export const INTENSITIES: { id: Intensity; label: string; hint: string }[] = [
 /** Maximum zoom reached by a motion at each intensity. */
 export const ZOOM: Record<Intensity, number> = { subtle: 1.08, normal: 1.15, dramatic: 1.3 };
 
+/**
+ * Easing for every move. It is a cubic Bézier with control points (1/3,0) and (2/3,1), which is exactly
+ * smoothstep (3t² − 2t³), so the browser preview (CSS) and the FFmpeg render (expression) ease identically.
+ */
+export const EASE_CSS = "cubic-bezier(0.333333, 0, 0.666667, 1)";
+export const ease = (t: number) => {
+  const c = Math.min(1, Math.max(0, t));
+  return c * c * (3 - 2 * c);
+};
+
 export interface View {
   /** zoom factor, 1 = whole image */
   s: number;

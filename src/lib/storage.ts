@@ -112,6 +112,20 @@ export async function readImage(videoId: string, n: number): Promise<{ ext: Imag
   return null;
 }
 
+/** Where a shot's image file is on disk (for FFmpeg), or null if it has none. */
+export async function imagePath(videoId: string, n: number): Promise<string | null> {
+  for (const ext of EXTS) {
+    const file = path.join(imagesDir(videoId), `${pad(n)}.${ext}`);
+    try {
+      await fs.access(file);
+      return file;
+    } catch {
+      /* try next extension */
+    }
+  }
+  return null;
+}
+
 export async function deleteImage(videoId: string, n: number): Promise<boolean> {
   let removed = false;
   for (const ext of EXTS) {
