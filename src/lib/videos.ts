@@ -5,6 +5,7 @@ import { STEP_IDS, type StepId, type StepStatus } from "./pipeline";
 import type { Intensity, MotionId } from "./motion";
 import type { VoiceChoice } from "./voice";
 import type { RenderOptions } from "./renderShared";
+import type { SeoData } from "./seoShared";
 
 export interface Idea {
   title: string;
@@ -55,6 +56,8 @@ export interface Video {
   voice?: VoiceChoice;
   /** background music mix settings; the file itself lives on disk */
   music?: { volume: number; duck: boolean };
+  /** title, description, tags, chapters and thumbnail settings */
+  seo?: SeoData;
   /** quality, frame rate, captions and sound choices for the render step */
   renderOptions?: Partial<RenderOptions>;
   motionIntensity?: Intensity;

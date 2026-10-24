@@ -6,7 +6,7 @@ import type { ChildProcess } from "node:child_process";
 import { buildAss } from "./captions";
 import { ffmpegAvailable, probeVideo, runFfmpeg } from "./ffmpeg";
 import { musicPath, shotAudioForRender } from "./audioStorage";
-import { RESOLUTIONS, type RenderJob, type RenderOutput, type RenderPlan, type RenderState } from "./renderShared";
+import { RESOLUTIONS, shotFrames, type RenderJob, type RenderOutput, type RenderPlan, type RenderState } from "./renderShared";
 import { imagePath, videoDir } from "./storage";
 import { zoompanExpr } from "./zoompan";
 
@@ -21,8 +21,6 @@ import { zoompanExpr } from "./zoompan";
  * until the new one is complete.
  */
 
-const SHOT_TAIL = 0.35; // seconds of breathing room after each shot's narration
-const LAST_TAIL = 1.0;
 const AUDIO_RATE = 48000;
 const FONT = process.env.CAPTION_FONT || "Poppins";
 
@@ -166,8 +164,7 @@ async function run(l: Live, plan: RenderPlan, shots: ShotInput[], music: string 
 
     // length of each clip, in whole frames so audio and video stay locked
     const plans = shots.map((s, i) => {
-      const tail = i === shots.length - 1 ? LAST_TAIL : SHOT_TAIL;
-      const frames = Math.max(fps, Math.ceil((s.duration + tail) * fps));
+      const frames = shotFrames(s.duration, i === shots.length - 1, fps);
       return { ...s, frames, seconds: frames / fps };
     });
     const totalFrames = plans.reduce((n, p) => n + p.frames, 0);

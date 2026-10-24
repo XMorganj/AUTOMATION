@@ -4,6 +4,15 @@ import type { CaptionStyle } from "./captions";
 
 const MAX_SHOT = 2000;
 
+/** Seconds of breathing room after each shot's narration (the last shot gets a longer one). */
+export const SHOT_TAIL = 0.35;
+export const LAST_TAIL = 1.0;
+
+/** How many frames a shot lasts in the render. The renderer and the chapter timestamps both use this, so they always agree. */
+export function shotFrames(narrationSeconds: number, isLast: boolean, fps: number): number {
+  return Math.max(fps, Math.ceil((narrationSeconds + (isLast ? LAST_TAIL : SHOT_TAIL)) * fps));
+}
+
 export const RESOLUTIONS = [
   { id: 720, label: "720p", w: 1280, h: 720, hint: "Fast, good for drafts" },
   { id: 1080, label: "1080p", w: 1920, h: 1080, hint: "Standard for YouTube" },
