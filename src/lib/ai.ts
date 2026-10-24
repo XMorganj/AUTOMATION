@@ -1,64 +1,30 @@
-import "server-only";
+// src/lib/aiService.ts
 
-/** Thin wrapper around the Anthropic Messages API. Server-side only: the key never reaches the browser. */
+async function callOllama(prompt: string, systemPrompt?: string): Promise<string> {
+  const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+  const model = process.env.OLLAMA_MODEL || 'huihui_ai/dolphin3-abliterated:8b-llama3.1-q4_K_M';
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
+  // Combine system prompt and user prompt for Ollama
+  const fullPrompt = systemPrompt ? `${systemPrompt}\n\nUser: ${prompt}` : prompt;
 
-export class AiError extends Error {
-  constructor(
-    message: string,
-    public status = 502,
-  ) {
-    super(message);
-  }
-}
-
-export function hasKey(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
-}
-
-export async function claude(prompt: string, maxTokens: number): Promise<string> {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new AiError("No API key configured.", 500);
-
-  const base = (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com").replace(/\/$/, "");
-  const res = await fetch(`${base}/v1/messages`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
+  const response = await fetch(`${baseUrl}/api/chat`, {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true' // Crucial: bypasses ngrok's web warning page for server-to-server calls
     },
     body: JSON.stringify({
-      model: MODEL,
-      max_tokens: maxTokens,
-      messages: [{ role: "user", content: prompt }],
+      model: model,
+      messages: [{ role: 'user', content: fullPrompt }],
+      stream: false,
     }),
-    signal: AbortSignal.timeout(170_000),
   });
 
-  if (!res.ok) {
-    const detail = await res.text();
-    console.error("Anthropic error", res.status, detail.slice(0, 500));
-    throw new AiError(`The AI service returned ${res.status}.`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to connect to local Ollama via ngrok: ${errorText}`);
   }
 
-  const data = (await res.json()) as { content?: { type: string; text?: string }[] };
-  const text = data.content?.find((c) => c.type === "text")?.text;
-  if (!text) throw new AiError("The AI service returned an empty response.");
-  return text;
-}
-
-/** Pull the first JSON array/object out of a model reply, tolerating stray prose or code fences. */
-export function extractJson<T>(text: string, kind: "array" | "object"): T {
-  const open = kind === "array" ? "[" : "{";
-  const close = kind === "array" ? "]" : "}";
-  const start = text.indexOf(open);
-  const end = text.lastIndexOf(close);
-  if (start === -1 || end <= start) throw new AiError("Couldn't read the AI response. Try again.");
-  try {
-    return JSON.parse(text.slice(start, end + 1)) as T;
-  } catch {
-    throw new AiError("Couldn't read the AI response. Try again.");
-  }
+  const data = await response.json();
+  return data.message.content;
 }
