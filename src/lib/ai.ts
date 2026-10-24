@@ -54,17 +54,26 @@ export function extractJson<T = any>(text: string): T {
 }
 
 /**
- * Claude client export supporting multiple generic arguments to match all API route calls.
+ * Claude client export supporting multiple generic arguments and optional request options.
  */
 export const claude = {
   messages: {
-    create: async <T = any, U = any, V = any>(params: { 
-      model?: string; 
-      max_tokens?: number; 
-      system?: string; 
-      messages: Array<{role: string, content: string}> 
-    }): Promise<{ content: [{ text: string }] }> => {
-      const prompt = params.messages.map(m => m.content).join('\n');
+    create: async <T = any, U = any, V = any>(
+      params: { 
+        model?: string; 
+        max_tokens?: number; 
+        system?: string; 
+        messages?: Array<{role: string, content: string}>;
+        [key: string]: any; 
+      }, 
+      options?: any
+    ): Promise<{ content: [{ text: string }] }> => {
+      let prompt = '';
+      if (params.messages && Array.isArray(params.messages)) {
+        prompt = params.messages.map(m => m.content).join('\n');
+      } else {
+        prompt = JSON.stringify(params);
+      }
       const text = await callAnthropic(prompt, params.system);
       return { content: [{ text }] };
     }
