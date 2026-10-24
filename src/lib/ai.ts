@@ -54,11 +54,11 @@ export function extractJson<T = any>(text: string): T {
 }
 
 /**
- * Claude client export with generic type support for messages.create.
+ * Claude client export supporting multiple generic arguments to match all API route calls.
  */
 export const claude = {
   messages: {
-    create: async <T = any>(params: { 
+    create: async <T = any, U = any, V = any>(params: { 
       model?: string; 
       max_tokens?: number; 
       system?: string; 
