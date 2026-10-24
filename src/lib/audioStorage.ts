@@ -167,3 +167,22 @@ export async function deleteMusic(videoId: string): Promise<boolean> {
   }
   return removed;
 }
+
+/* ---------- paths and word timing, for the renderer ---------- */
+
+/** The narration file for a shot with its length and word timing, or null if it hasn't been generated. */
+export async function shotAudioForRender(videoId: string, n: number): Promise<{ file: string; duration: number; words: WordTiming[] } | null> {
+  try {
+    const full = JSON.parse(await fs.readFile(path.join(audioDir(videoId), `${pad(n)}.json`), "utf8")) as StoredAudio;
+    const file = path.join(audioDir(videoId), `${pad(n)}.${full.ext}`);
+    await fs.access(file);
+    return { file, duration: full.duration, words: Array.isArray(full.words) ? full.words : [] };
+  } catch {
+    return null;
+  }
+}
+
+export async function musicPath(videoId: string): Promise<string | null> {
+  const info = await musicInfo(videoId);
+  return info ? path.join(videoDir(videoId), `music.${info.ext}`) : null;
+}
