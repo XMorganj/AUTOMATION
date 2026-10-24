@@ -9,7 +9,7 @@ interface GenerateOptions {
 /**
  * Custom AI Error class for handling status codes and errors.
  */
-class AiError extends Error {
+export class AiError extends Error {
   status: number;
   constructor(message: string, status: number = 500) {
     super(message);
@@ -30,7 +30,7 @@ export function hasKey(provider?: string): boolean {
 }
 
 /**
- * Extracts and parses JSON with generic typing support to prevent implicit any errors.
+ * Extracts and parses JSON with generic typing support.
  */
 export function extractJson<T = any>(text: string): T {
   try {
