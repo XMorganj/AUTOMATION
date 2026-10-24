@@ -24,8 +24,14 @@ npm run dev                  # http://localhost:3000
 | 5. Images (drop images, ZIP or folder; matched to shots; replace, remove) | Done |
 | 6. Motion (per-shot zoom/pan, live preview, intensity, shuffle) | Done |
 | 7. Voiceover (ElevenLabs voices, models, delivery presets, per-shot redo, credit estimate, background music) | Done |
-| 8–10 Render, Title & SEO, Upload | Next |
+| 8. Render (FFmpeg: zoom/pan motion, word-by-word captions, music ducking, 720p/1080p/4K, 24/30 fps) | Done |
+| 9–10 Title & SEO, Upload | Next |
 | Publish, Shorts, Calendar, Channels, YouTube | Next |
+
+## Needs
+
+- Node 20+ and **FFmpeg** (with libx264 and libass, which standard builds have) on your PATH for the Render step. Check with `ffmpeg -version`. Set `FFMPEG_PATH` / `FFPROBE_PATH` if it lives elsewhere.
+- Captions use the font named in `CAPTION_FONT` (default Poppins). If it isn't installed, your system falls back to a default font.
 
 ## Notes
 
@@ -41,3 +47,5 @@ npm run dev                  # http://localhost:3000
 - Without `ELEVENLABS_API_KEY` the Voiceover step runs in demo mode: silent placeholder audio with realistic timing, so the rest of the pipeline can be tried.
 - Narration is made one shot at a time, so redoing a single shot is cheap and each shot has an exact duration. Word-level timings from ElevenLabs are saved for the captions in the Render step.
 - Generating narration spends ElevenLabs characters, so the app shows the character count and your remaining balance and asks first.
+- Rendering makes one clip per shot (zoom/pan with the same easing as the preview, captions burned in), then joins them without re-encoding and mixes narration + music. Only one render runs at a time, and a new render never replaces your last good video until it finishes. The finished file is in `data/videos/<id>/render/video.mp4`.
+- The Render screen marks a finished video "out of date" if you change the settings, motion, images, narration or music after rendering.

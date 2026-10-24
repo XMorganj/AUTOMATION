@@ -143,6 +143,12 @@ export async function startRender(videoId: string, plan: RenderPlan): Promise<{ 
   return { ok: true, job };
 }
 
+/** Remember the running FFmpeg so Stop can kill it; if Stop already happened, kill it straight away. */
+function track(l: Live, c: ChildProcess) {
+  l.child = c;
+  if (l.canceled) c.kill("SIGKILL");
+}
+
 async function run(l: Live, plan: RenderPlan, shots: ShotInput[], music: string | null) {
   const { videoId, job } = l;
   const res = RESOLUTIONS.find((r) => r.id === plan.resolution)!;
@@ -209,7 +215,7 @@ async function run(l: Live, plan: RenderPlan, shots: ShotInput[], music: string 
         ],
         {
           cwd: work,
-          onStart: (c) => (l.child = c),
+          onStart: (c) => track(l, c),
           onFrame: (f) => {
             job.progress = ((before + Math.min(f, p.frames)) / totalFrames) * SHOTS_SHARE;
           },
@@ -251,7 +257,7 @@ async function run(l: Live, plan: RenderPlan, shots: ShotInput[], music: string 
     const tmp = path.join(root, "video.tmp.mp4");
     await runFfmpeg(
       [...args, "-filter_complex", filters.join(";"), "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", String(AUDIO_RATE), "-movflags", "+faststart", "-t", T, tmp],
-      { cwd: work, onStart: (c) => (l.child = c) },
+      { cwd: work, onStart: (c) => track(l, c) },
     );
     check();
 

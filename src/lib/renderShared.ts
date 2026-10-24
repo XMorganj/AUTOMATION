@@ -17,6 +17,17 @@ export const CAPTION_OPTIONS: { id: CaptionStyle; label: string; hint: string }[
   { id: "off", label: "None", hint: "No captions" },
 ];
 
+/** The choices on the Render screen that are saved with the video. */
+export interface RenderOptions {
+  resolution: ResolutionId;
+  fps: 24 | 30;
+  captions: CaptionStyle;
+  loudness: boolean;
+  useMusic: boolean;
+}
+
+export const DEFAULT_RENDER_OPTIONS: RenderOptions = { resolution: 1080, fps: 30, captions: "karaoke", loudness: true, useMusic: true };
+
 export interface RenderPlan {
   resolution: ResolutionId;
   fps: 24 | 30;
