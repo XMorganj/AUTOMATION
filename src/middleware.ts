@@ -4,8 +4,8 @@ export function middleware(req: NextRequest) {
   const basicAuth = req.headers.get('authorization');
 
   // Get credentials from environment variables (with fallback defaults)
-  const expectedUser = process.env.BASIC_AUTH_USER || 'morganj';
-  const expectedPassword = process.env.BASIC_AUTH_PASSWORD || '36626835@#12Automation';
+  const expectedUser = process.env.BASIC_AUTH_USER || 'admin';
+const expectedPassword = process.env.BASIC_AUTH_PASSWORD || 'securepassword';
 
   if (basicAuth) {
     const authValue = basicAuth.split(' ')[1];
