@@ -14,8 +14,37 @@ export function hasKey(provider?: string): boolean {
   if (activeProvider === 'anthropic') {
     return !!process.env.ANTHROPIC_API_KEY;
   }
-  // Ollama uses local/ngrok URLs
   return !!process.env.OLLAMA_BASE_URL || true;
+}
+
+/**
+ * Extracts and parses JSON from raw AI text responses (handles markdown blocks or raw strings).
+ */
+export function extractJson(text: string): any {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    // Look for markdown json code block
+    const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (match && match[1]) {
+      try {
+        return JSON.parse(match[1]);
+      } catch (err) {
+        // continue
+      }
+    }
+    // Fallback: find first { and last }
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(text.substring(firstBrace, lastBrace + 1));
+      } catch (err) {
+        // continue
+      }
+    }
+    throw new Error('Failed to extract valid JSON from AI response');
+  }
 }
 
 export async function generateAIContent({ prompt, systemPrompt, provider }: GenerateOptions): Promise<string> {
