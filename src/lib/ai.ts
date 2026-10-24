@@ -9,7 +9,7 @@ interface GenerateOptions {
 /**
  * Custom AiError class for handling status codes and errors.
  */
-public class AiError extends Error {
+export class AiError extends Error {
   status: number;
   constructor(message: string, status: number = 500) {
     super(message);
@@ -71,7 +71,6 @@ export const claude = {
       
       const systemPrompt = params.system || 'You are an expert YouTube scriptwriter specializing in dark history and mystery content. Output valid JSON only.';
       
-      // Use generateAIContent so it respects DEFAULT_AI_PROVIDER=ollama & hits ngrok
       const text = await generateAIContent({ prompt, systemPrompt });
       return { content: [{ text }] };
     }
