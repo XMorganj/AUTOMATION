@@ -7,12 +7,12 @@ import { STEPS } from "@/lib/pipeline";
 import { deleteVideo, progressOf, type Video } from "@/lib/videos";
 
 /** One video on the production board. */
-export function VideoRow({ video, removable = false }: { video: Video; removable?: boolean }) {
+export function VideoRow({ video, removable = false, index = 0 }: { video: Video; removable?: boolean; index?: number }) {
   const done = Math.round(progressOf(video) * STEPS.length);
   const step = STEPS.find((s) => s.id === video.currentStep)?.label;
   const finished = done === STEPS.length;
   return (
-    <li className="glass glass-hover flex items-center gap-3 p-4">
+    <li className="glass glass-hover rise flex items-center gap-3 p-4" style={{ ["--i" as string]: Math.min(index, 8) }}>
       <Link href={`/generate/${video.id}`} className="min-w-0 flex-1">
         <div className="eyebrow mb-1">
           {finished ? "Published" : `Now on ${step}`} · {video.lengthMin} min

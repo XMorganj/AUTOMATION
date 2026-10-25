@@ -43,3 +43,11 @@ export function lengthStats(minutes: number) {
   const words = Math.round(minutes * WORDS_PER_MIN);
   return { words, images: Math.round(words / WORDS_PER_SHOT) };
 }
+
+/** The ten steps grouped into four stages, for the pipeline board. */
+export const STAGES: { id: string; label: string; steps: StepId[] }[] = [
+  { id: "write", label: "Write", steps: ["idea", "script", "factcheck"] },
+  { id: "visuals", label: "Visuals", steps: ["prompts", "images", "motion"] },
+  { id: "sound", label: "Sound & render", steps: ["voice", "render"] },
+  { id: "ship", label: "Ship", steps: ["seo", "upload"] },
+];
