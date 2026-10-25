@@ -246,7 +246,7 @@ export function ImagesStep({ video }: { video: Video }) {
           aria-valuemax={100}
           aria-label="Shots with images"
         >
-          <div className="h-full rounded-full transition-[width]" style={{ width: `${pct}%`, background: "linear-gradient(90deg, var(--accent), var(--accent-2))" }} />
+          <div className="h-full rounded-full transition-[width]" style={{ width: `${pct}%`, background: "var(--accent)" }} />
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-# Automation Studio
+# MA Studio (Morgan Automation Studio)
 
 A studio that takes a YouTube video from idea to published: idea → script → fact check → image prompts → images → motion → voiceover → render → title & SEO → upload.
 

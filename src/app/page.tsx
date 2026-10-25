@@ -3,133 +3,113 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
-import { CalendarRange, Clapperboard, Scissors, Sparkles, UploadCloud } from "lucide-react";
+import { CalendarRange, Plus, Scissors, UploadCloud } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
-import { createVideo, progressOf, useVideos } from "@/lib/videos";
-import { STEPS } from "@/lib/pipeline";
+import { SystemsPanel } from "@/components/SystemsPanel";
+import { VideoRow } from "@/components/VideoRow";
+import { createVideo, useVideos } from "@/lib/videos";
 
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
-
-function useGreeting() {
-  return useSyncExternalStore(
-    () => () => {},
-    greeting,
-    () => "Welcome",
-  );
+function today() {
+  return new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 }
+const none = () => () => {};
+const useGreeting = () => useSyncExternalStore(none, greeting, () => "Welcome");
+const useToday = () => useSyncExternalStore(none, today, () => "");
 
-export default function HomePage() {
+export default function DeskPage() {
   const router = useRouter();
   const hello = useGreeting();
+  const date = useToday();
   const videos = useVideos();
-  const recent = [...videos].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 4);
+  const sorted = [...videos].sort((a, b) => b.updatedAt - a.updatedAt);
 
-  const start = () => {
-    const v = createVideo();
-    router.push(`/generate/${v.id}`);
-  };
+  const published = videos.filter((v) => v.steps.upload === "approved").length;
+  const toUpload = videos.filter((v) => v.steps.upload !== "approved" && v.steps.seo === "approved").length;
+  const inProduction = videos.length - published - toUpload;
+
+  const start = () => router.push(`/generate/${createVideo().id}`);
 
   return (
     <>
-      <PageHeader title={`${hello}.`} subtitle="What do you want to make today?" />
+      <PageHeader
+        eyebrow={date ? `Desk · ${date}` : "Desk"}
+        title={`${hello}.`}
+        subtitle="Everything in production, and what each video needs next."
+        actions={
+          <button className="btn btn-primary" onClick={start}>
+            <Plus size={15} /> New video
+          </button>
+        }
+      />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Start something">
-        <button
-          onClick={start}
-          className="glass glass-hover group relative overflow-hidden p-5 text-left"
-          style={{ borderColor: "color-mix(in srgb, var(--accent) 55%, transparent)" }}
-        >
-          <div
-            className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full blur-3xl"
-            style={{ background: "var(--accent)", opacity: 0.22 }}
-          />
-          <Sparkles className="mb-4" style={{ color: "var(--accent)" }} size={22} />
-          <h2 className="text-base font-bold">Generate an AI video</h2>
-          <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-            Idea → script → images → voice → finished video, in any niche and style.
-          </p>
-        </button>
+      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+        <div className="min-w-0">
+          <dl className="mb-6 grid grid-cols-3 gap-px overflow-hidden rounded-[10px] border" style={{ background: "var(--border)", borderColor: "var(--border)" }}>
+            {[
+              ["In production", inProduction],
+              ["Ready to upload", toUpload],
+              ["Published", published],
+            ].map(([label, n]) => (
+              <div key={label} className="px-4 py-3" style={{ background: "var(--surface)" }}>
+                <dt className="eyebrow">{label}</dt>
+                <dd className="mt-1 font-[family-name:var(--font-display)] text-3xl">{n}</dd>
+              </div>
+            ))}
+          </dl>
 
-        <ActionCard href="/publish" icon={<UploadCloud size={22} />} title="Publish your own video">
-          Drop in a video you made. Get captions, title, description, tags and a thumbnail.
-        </ActionCard>
-        <ActionCard href="/shorts" icon={<Scissors size={22} />} title="Make Shorts">
-          Turn a long video into vertical Shorts with captions and titles.
-        </ActionCard>
-        <ActionCard href="/calendar" icon={<CalendarRange size={22} />} title="Plan your content">
-          See what&apos;s planned, scheduled and uploaded.
-        </ActionCard>
-      </section>
+          <h2 className="eyebrow mb-3" style={{ fontFamily: "var(--font-mono)" }}>
+            Production board
+          </h2>
+          {sorted.length === 0 ? (
+            <div className="glass p-6">
+              <p className="max-w-md text-sm text-[var(--text-muted)]">
+                Nothing in production yet. Start a video and it appears here with a block for each of its ten steps.
+              </p>
+              <button className="btn btn-primary mt-4" onClick={start}>
+                <Plus size={15} /> Start the first video
+              </button>
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {sorted.slice(0, 8).map((v) => (
+                <VideoRow key={v.id} video={v} />
+              ))}
+            </ul>
+          )}
+          {sorted.length > 8 && (
+            <Link href="/generate" className="btn mt-4">
+              All {sorted.length} videos
+            </Link>
+          )}
+        </div>
 
-      <section className="mt-10" aria-labelledby="continue-h">
-        <h2 id="continue-h" className="mb-3 px-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--text-faint)]">
-          Continue where you left off
-        </h2>
-
-        {recent.length === 0 ? (
-          <div className="glass flex flex-col items-start gap-3 p-6">
-            <Clapperboard size={22} style={{ color: "var(--accent)" }} />
-            <p className="text-sm text-[var(--text-muted)]">
-              No videos yet. Start your first one and it will show up here with its progress.
-            </p>
-            <button className="btn btn-primary" onClick={start}>
-              <Sparkles size={15} /> New AI video
-            </button>
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {recent.map((v) => {
-              const pct = Math.round(progressOf(v) * 100);
-              const step = STEPS.find((s) => s.id === v.currentStep)?.label;
-              return (
-                <Link key={v.id} href={`/generate/${v.id}`} className="glass glass-hover block p-4">
-                  <div className="text-[11px] font-semibold text-[var(--text-faint)]">AI video · {step}</div>
-                  <div className="mt-1 line-clamp-2 min-h-[2.6em] text-sm font-bold leading-snug">{v.title}</div>
-                  <div
-                    className="mt-3 h-1.5 overflow-hidden rounded-full"
-                    style={{ background: "var(--border)" }}
-                    role="progressbar"
-                    aria-valuenow={pct}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label="Progress"
-                  >
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${Math.max(pct, 4)}%`, background: "linear-gradient(90deg, var(--accent), var(--accent-2))" }}
-                    />
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </section>
-    </>
-  );
-}
-
-function ActionCard({
-  href,
-  icon,
-  title,
-  children,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link href={href} className="glass glass-hover block p-5">
-      <div className="mb-4" style={{ color: "var(--accent)" }}>
-        {icon}
+        <aside className="space-y-4">
+          <SystemsPanel />
+          <section className="glass p-4" aria-labelledby="tools-h">
+            <h2 id="tools-h" className="eyebrow mb-3" style={{ fontFamily: "var(--font-mono)" }}>
+              Other tools
+            </h2>
+            <ul className="space-y-1">
+              {[
+                { href: "/publish", label: "Publish a video you made", icon: UploadCloud },
+                { href: "/shorts", label: "Cut Shorts", icon: Scissors },
+                { href: "/calendar", label: "Content calendar", icon: CalendarRange },
+              ].map(({ href, label, icon: Icon }) => (
+                <li key={href}>
+                  <Link href={href} className="flex items-center gap-3 rounded-md px-2 py-2 text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]">
+                    <Icon size={16} style={{ color: "var(--accent)" }} />
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </aside>
       </div>
-      <h2 className="text-base font-bold">{title}</h2>
-      <p className="mt-1.5 text-sm text-[var(--text-muted)]">{children}</p>
-    </Link>
+    </>
   );
 }
