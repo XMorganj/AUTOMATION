@@ -15,6 +15,31 @@ interface Shot {
   narration: string;
 }
 
+/**
+ * Turn whatever list the model returned into exactly `n` prompts, in order. Extras are dropped, and anything it
+ * skipped or left blank comes back as null so just those can be asked for again. Accepts plain strings, objects
+ * like {"prompt": "..."}, or an object keyed by position.
+ */
+function coercePrompts(parsed: unknown, n: number): (string | null)[] {
+  let items: unknown[] = [];
+  if (Array.isArray(parsed)) items = parsed;
+  else if (parsed && typeof parsed === "object") {
+    const o = parsed as Record<string, unknown>;
+    const inner = o.prompts ?? o.items ?? o.result;
+    items = Array.isArray(inner) ? inner : Object.keys(o).sort((a, b) => Number(a) - Number(b)).map((k) => o[k]);
+  }
+  const text = (v: unknown): string | null => {
+    if (typeof v === "string") return v.trim() || null;
+    if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      const t = o.prompt ?? o.text ?? o.description;
+      return typeof t === "string" ? t.trim() || null : null;
+    }
+    return null;
+  };
+  return Array.from({ length: n }, (_, i) => text(items[i]));
+}
+
 export async function POST(req: Request) {
   let body: {
     title?: unknown;
@@ -94,11 +119,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const list = shots
-    .map((s) => `${s.n}. ${s.narration}`)
-    .join("\n");
-
-  const prompt = `
+  const buildPrompt = (subset: Shot[]) => {
+    const list = subset.map((s) => `${s.n}. ${s.narration}`).join("\n");
+    return `
 You are an expert cinematic image prompt engineer.
 
 Generate image-generation prompts for a YouTube video.
@@ -117,7 +140,7 @@ ${list}
 
 INSTRUCTIONS:
 
-1. Generate exactly ${shots.length} image prompts.
+1. Generate exactly ${subset.length} image prompts.
 2. Each prompt must describe one clear visual scene.
 3. Maintain the locked art style across every scene.
 4. Keep recurring characters visually consistent.
@@ -129,38 +152,42 @@ INSTRUCTIONS:
 10. Every prompt must end with:
 "16:9 widescreen. No text, no captions, no watermark."
 
-Return ONLY a valid JSON array of exactly ${shots.length} strings.
+Return ONLY a valid JSON array of exactly ${subset.length} strings.
 
 Do not include explanations or code fences.
 `;
+  };
 
   try {
-    const text = await generateAIContent({
-      prompt,
-      systemPrompt:
-        "You are an expert cinematic image prompt engineer. Return only valid JSON arrays.",
-      maxTokens: Math.min(16_000, shots.length * 260 + 400),
-    });
+    const ask = async (subset: Shot[]): Promise<(string | null)[]> => {
+      const text = await generateAIContent({
+        prompt: buildPrompt(subset),
+        systemPrompt:
+          "You are an expert cinematic image prompt engineer. Return only valid JSON arrays.",
+        maxTokens: Math.min(16_000, subset.length * 260 + 400),
+      });
+      return coercePrompts(extractJson<unknown>(text), subset.length);
+    };
 
-    const arr = extractJson<unknown[]>(text);
-
-    if (
-      !Array.isArray(arr) ||
-      arr.length !== shots.length ||
-      arr.some(
-        (p) =>
-          typeof p !== "string" ||
-          !p.trim()
-      )
-    ) {
+    // First pass for the whole batch, then one more pass for only the shots that came back empty
+    const out: (string | null)[] = await ask(shots);
+    const missing = () => shots.filter((_, i) => !out[i]);
+    if (missing().length > 0) {
+      const subset = missing();
+      const again = await ask(subset).catch(() => [] as (string | null)[]);
+      subset.forEach((sh, j) => {
+        if (again[j]) out[shots.indexOf(sh)] = again[j];
+      });
+    }
+    if (missing().length > 0) {
       throw new AiError(
-        "The AI returned the wrong number of prompts. Try again."
+        `The AI only wrote ${shots.length - missing().length} of ${shots.length} prompts. Press Build again to retry the rest.`
       );
     }
 
     return NextResponse.json({
       mock: false,
-      prompts: (arr as string[]).map((p) => p.trim()),
+      prompts: out as string[],
     });
 
   } catch (err) {
