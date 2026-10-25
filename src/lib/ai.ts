@@ -3,7 +3,7 @@ import "server-only";
 /**
  * Text generation for ideas, scripts, fact checks and image prompts. Server-side only: keys never reach the browser.
  *
- * Provider is chosen by DEFAULT_AI_PROVIDER ("ollama" by default, or "anthropic"):
+ * Provider is chosen by DEFAULT_AI_PROVIDER ("anthropic" by default, or "ollama"):
  *  - ollama:    a local model, reached at OLLAMA_BASE_URL (works through an ngrok URL too). OLLAMA_MODEL, OLLAMA_NUM_CTX.
  *  - anthropic: Claude, with ANTHROPIC_API_KEY. ANTHROPIC_MODEL and ANTHROPIC_BASE_URL are optional.
  */
@@ -29,7 +29,7 @@ export class AiError extends Error {
 }
 
 export function activeProvider(provider?: string): Provider {
-  const p = (provider || process.env.DEFAULT_AI_PROVIDER || "ollama").toLowerCase();
+  const p = (provider || process.env.DEFAULT_AI_PROVIDER || "anthropic").toLowerCase();
   return p === "anthropic" ? "anthropic" : "ollama";
 }
 
@@ -69,7 +69,7 @@ export async function generateAIContent(opts: GenerateOptions): Promise<string> 
 
 async function callAnthropic({ prompt, systemPrompt, maxTokens }: GenerateOptions): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new AiError("ANTHROPIC_API_KEY isn't set. Add it to .env.local, or set DEFAULT_AI_PROVIDER=ollama.", 400);
+  if (!apiKey) throw new AiError("ANTHROPIC_API_KEY isn't set. Add it to .env.local, or set DEFAULT_AI_PROVIDER=ollama to use a local model.", 400);
   const base = (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com").replace(/\/+$/, "");
 
   let res: Response;
