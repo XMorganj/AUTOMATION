@@ -117,6 +117,7 @@ export function SeoStep({ video }: { video: Video }) {
 
   function approve() {
     updateVideo(video.id, (v) => ({
+      seo: v.seo ? { ...v.seo, finalDescription: full } : v.seo,
       currentStep: "upload",
       steps: { ...v.steps, seo: "approved", upload: v.steps.upload === "not_started" ? "in_progress" : v.steps.upload },
     }));

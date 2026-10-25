@@ -60,6 +60,10 @@ export interface Video {
   seo?: SeoData;
   /** quality, frame rate, captions and sound choices for the render step */
   renderOptions?: Partial<RenderOptions>;
+  /** the choices made on the Upload screen, so a reload or a second upload keeps them */
+  uploadSettings?: { privacy: "private" | "unlisted" | "public" | "schedule"; categoryId: string; kids: boolean | null; ai: boolean };
+  /** set when the video has been uploaded to YouTube */
+  youtube?: { id: string; privacy: string; uploadedAt: number; publishAt?: string };
   motionIntensity?: Intensity;
   /** seeds the automatic motion pattern; "Shuffle" picks a new one */
   motionSeed?: number;

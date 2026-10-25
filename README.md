@@ -26,7 +26,7 @@ npm run dev                  # http://localhost:3000
 | 7. Voiceover (ElevenLabs voices, models, delivery presets, per-shot redo, credit estimate, background music) | Done |
 | 8. Render (FFmpeg: zoom/pan motion, word-by-word captions, music ducking, 720p/1080p/4K, 24/30 fps) | Done |
 | 9. Title & SEO (5 title options, description, tags, hashtags, exact chapter timestamps, thumbnail maker, checklist) | Done |
-| 10. Upload | Next |
+| 10. Upload | Done |
 | Publish, Shorts, Calendar, Channels, YouTube | Next |
 
 ## Needs
@@ -52,3 +52,15 @@ npm run dev                  # http://localhost:3000
 - The Render screen marks a finished video "out of date" if you change the settings, motion, images, narration or music after rendering.
 - Chapter timestamps come from the narration lengths using the same frame maths as the renderer, so they match the finished video. YouTube needs at least 3 chapters, the first at 0:00, each 10 seconds or longer; chapters that break that are merged or dropped.
 - The thumbnail is drawn in your browser (1280×720 JPEG under 2 MB) and saved to `data/videos/<id>/thumbnail.jpg` for the Upload step. YouTube rejects `<` and `>` in titles, descriptions and tags, so those are removed.
+
+## Upload to YouTube (step 10)
+
+1. In [Google Cloud](https://console.cloud.google.com) make a project, enable **YouTube Data API v3**, set up the OAuth consent screen (External, add your own Google account as a test user), and create an **OAuth client ID** of type *Web application*.
+2. Add the redirect address the Upload screen shows you (`https://YOUR-SITE/api/youtube/callback`; also `http://localhost:3000/api/youtube/callback` for local use).
+3. Put `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the site's environment and restart. Press **Connect YouTube** on the Upload step.
+
+- The sign-in is kept on the server in `data/youtube/tokens.json` (owner-only file). It is never sent to the browser.
+- The video is sent in 8 MB pieces. If the connection drops, it asks YouTube how much arrived and carries on; a failed upload can be resumed later without starting over.
+- Visibility: private (default), unlisted, public, or scheduled (uploaded private, goes public at the time you pick). Category, audience (made for kids) and an AI-content disclosure are set per upload and remembered per video.
+- The thumbnail is set after the upload. YouTube only accepts custom thumbnails from verified channels; if refused, the video still uploads and the screen says so.
+- While the Google consent screen is in *Testing* the login expires after 7 days. Press **Publish app** on the consent screen to avoid that. New Google projects may have uploads forced to private until the project passes Google's audit.

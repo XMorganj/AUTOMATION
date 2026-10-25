@@ -37,6 +37,8 @@ export interface SeoData {
   thumb?: ThumbSettings;
   /** time the saved thumbnail file was written (0 = none) */
   thumbSavedAt?: number;
+  /** the description exactly as it will be posted (text, chapters, hashtags), saved when the step is approved */
+  finalDescription?: string;
   /** hash of the script these were written from, to notice later edits */
   scriptHash: string;
   mock?: boolean;
