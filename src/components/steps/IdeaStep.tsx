@@ -70,7 +70,7 @@ export function IdeaStep({ video }: { video: Video }) {
           ))}
         </div>
         <p className="mt-2 text-xs text-[var(--text-muted)]">
-          ≈ {stats.words.toLocaleString()} words of narration · about {stats.images} images.{" "}
+          ≈ {stats.words.toLocaleString()} words of narration · about {stats.images} images · about {stats.chars.toLocaleString()} voice characters.{" "}
           {video.lengthMin >= 8 ? "8+ minutes lets YouTube show mid-roll ads." : "Under 8 minutes can't carry mid-roll ads."}
         </p>
       </div>

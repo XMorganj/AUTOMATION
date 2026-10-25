@@ -7,6 +7,7 @@ import { ArrowRight, CalendarRange, Plus, Scissors, UploadCloud } from "lucide-r
 import { PageHeader } from "@/components/PageHeader";
 import { RunStrip } from "@/components/RunStrip";
 import { SystemsPanel } from "@/components/SystemsPanel";
+import { UsagePanel } from "@/components/UsagePanel";
 import { VideoRow } from "@/components/VideoRow";
 import { STAGES, STEPS } from "@/lib/pipeline";
 import { createVideo, progressOf, useVideos, type Video } from "@/lib/videos";
@@ -26,7 +27,6 @@ const words = (v: Video) => (v.script ? v.script.trim().split(/\s+/).filter(Bool
 const isPublished = (v: Video) => v.steps.upload === "approved";
 
 const ROADMAP = [
-  "Cost meter for every video",
   "Series presets: one look, many videos",
   "Batch queue that runs overnight",
   "Auto-cut Shorts",
@@ -175,6 +175,7 @@ export default function DeskPage() {
         </div>
 
         <aside className="space-y-4">
+          <UsagePanel />
           <SystemsPanel />
 
           <section className="glass p-4" aria-labelledby="tools-h">
