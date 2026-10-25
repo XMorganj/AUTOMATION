@@ -10,10 +10,10 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" subtitle="Make the studio yours." />
+      <PageHeader eyebrow="Settings" title="Make it yours" subtitle="Theme and accent colour. Saved in this browser." />
 
       <section className="glass p-5 md:p-7" aria-labelledby="appearance-h">
-        <h2 id="appearance-h" className="mb-4 text-lg font-bold">
+        <h2 id="appearance-h" className="mb-4 text-xl">
           Appearance
         </h2>
 
@@ -24,17 +24,17 @@ export default function SettingsPage() {
               role="radio"
               aria-checked={theme === t}
               onClick={() => setTheme(t)}
-              className="glass glass-hover flex items-center gap-2.5 p-4 text-sm font-semibold capitalize"
+              className="glass glass-hover flex items-center gap-2.5 p-4 text-sm font-semibold "
               style={theme === t ? { borderColor: "var(--accent)", boxShadow: "0 0 0 1px var(--accent)" } : undefined}
             >
               {t === "dark" ? <Moon size={16} /> : <Sun size={16} />}
-              {t}
+              {t === "dark" ? "Ink (dark)" : "Paper (light)"}
             </button>
           ))}
         </div>
 
         <h3 className="mb-1 mt-8 text-sm font-bold">Accent colour</h3>
-        <p className="mb-3 text-xs text-[var(--text-muted)]">Used for buttons, highlights and the background glow.</p>
+        <p className="mb-3 text-xs text-[var(--text-muted)]">Used for buttons, highlights and the active step.</p>
         <div className="flex flex-wrap gap-3" role="radiogroup" aria-label="Accent colour">
           {ACCENTS.map((a) => (
             <button
@@ -45,9 +45,10 @@ export default function SettingsPage() {
               className="flex flex-col items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)]"
             >
               <span
-                className="size-9 rounded-full transition-transform hover:scale-110"
+                className="size-9 transition-transform hover:scale-110" /* square swatch */
                 style={{
                   background: a.color,
+                  borderRadius: 6,
                   boxShadow: accent === a.id ? `0 0 0 3px var(--bg), 0 0 0 5px ${a.color}` : "none",
                 }}
               />

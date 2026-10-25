@@ -36,78 +36,93 @@ export default function VideoPage() {
     <>
       <Link
         href="/generate"
-        className="mb-2 inline-flex items-center gap-1.5 px-1 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text)]"
+        className="eyebrow mb-3 inline-flex items-center gap-1.5 hover:text-[var(--text)]"
       >
-        <ArrowLeft size={13} /> All videos
+        <ArrowLeft size={12} /> All videos
       </Link>
-      <h1 className="mb-5 px-1 text-xl font-bold tracking-tight md:text-2xl">{video.title}</h1>
+      <h1 className="mb-6 text-balance text-2xl leading-tight md:text-3xl">{video.title}</h1>
 
-      <Stepper video={video} />
+      <div className="grid gap-5 lg:grid-cols-[220px_1fr]">
+        <RunSheet video={video} />
 
-      <section className="glass mt-5 p-5 md:p-7" aria-labelledby="step-h">
-        <div className="mb-1 flex items-center gap-3">
-          <h2 id="step-h" className="text-xl font-bold">
-            {step.label}
-          </h2>
-          <StatusBadge status={video.steps[step.id]} />
-        </div>
-        <p className="mb-6 text-sm text-[var(--text-muted)]">{step.blurb}</p>
-
-        {step.id === "idea" ? (
-          <IdeaStep video={video} />
-        ) : step.id === "script" ? (
-          <ScriptStep video={video} />
-        ) : step.id === "factcheck" ? (
-          <FactCheckStep video={video} />
-        ) : step.id === "prompts" ? (
-          <PromptsStep video={video} />
-        ) : step.id === "images" ? (
-          <ImagesStep video={video} />
-        ) : step.id === "motion" ? (
-          <MotionStep video={video} />
-        ) : step.id === "voice" ? (
-          <VoiceStep video={video} />
-        ) : step.id === "render" ? (
-          <RenderStep video={video} />
-        ) : step.id === "seo" ? (
-          <SeoStep video={video} />
-        ) : (
-          <div className="rounded-2xl border border-dashed p-6 text-sm text-[var(--text-muted)]" style={{ borderColor: "var(--border-strong)" }}>
-            This step is next on the build list. The pipeline, saved state and navigation already work, so it will
-            plug straight in.
+        <section className="glass min-w-0 p-5 md:p-7" aria-labelledby="step-h">
+          <div className="eyebrow mb-2">
+            Step {STEPS.findIndex((s) => s.id === step.id) + 1} of {STEPS.length}
           </div>
-        )}
-      </section>
+          <div className="mb-1 flex flex-wrap items-center gap-3">
+            <h2 id="step-h" className="text-2xl">
+              {step.label}
+            </h2>
+            <StatusBadge status={video.steps[step.id]} />
+          </div>
+          <p className="mb-6 text-sm text-[var(--text-muted)]">{step.blurb}</p>
+
+          {step.id === "idea" ? (
+            <IdeaStep video={video} />
+          ) : step.id === "script" ? (
+            <ScriptStep video={video} />
+          ) : step.id === "factcheck" ? (
+            <FactCheckStep video={video} />
+          ) : step.id === "prompts" ? (
+            <PromptsStep video={video} />
+          ) : step.id === "images" ? (
+            <ImagesStep video={video} />
+          ) : step.id === "motion" ? (
+            <MotionStep video={video} />
+          ) : step.id === "voice" ? (
+            <VoiceStep video={video} />
+          ) : step.id === "render" ? (
+            <RenderStep video={video} />
+          ) : step.id === "seo" ? (
+            <SeoStep video={video} />
+          ) : (
+            <div className="border border-dashed p-6 text-sm text-[var(--text-muted)]" style={{ borderColor: "var(--border-strong)", borderRadius: 8 }}>
+              This step is next on the build list. The pipeline, saved state and navigation already work, so it will
+              plug straight in.
+            </div>
+          )}
+        </section>
+      </div>
     </>
   );
 }
 
-function Stepper({ video }: { video: Video }) {
+/** The run sheet: every step in order, with its status, down the side (or along the top on small screens). */
+function RunSheet({ video }: { video: Video }) {
   return (
-    <nav aria-label="Video steps" className="-mx-1 overflow-x-auto px-1 pb-1">
-      <ol className="flex min-w-max gap-2">
+    <nav aria-label="Video steps" className="lg:sticky lg:top-20 lg:self-start">
+      <ol className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:px-0">
         {STEPS.map((s, i) => {
           const status = video.steps[s.id];
           const active = video.currentStep === s.id;
           const done = status === "approved";
+          const tone =
+            status === "approved" ? "var(--good)" : status === "in_progress" ? "var(--warn)" : status === "ready" ? "var(--accent)" : "var(--border-strong)";
           return (
-            <li key={s.id}>
+            <li key={s.id} className="relative shrink-0">
               <button
                 aria-current={active ? "step" : undefined}
                 onClick={() => updateVideo(video.id, { currentStep: s.id as StepId })}
-                className="pill"
-                data-active={active}
-                style={
-                  done && !active
-                    ? { color: "var(--good)", borderColor: "color-mix(in srgb, var(--good) 40%, transparent)" }
-                    : undefined
-                }
+                className="flex w-full items-center gap-3 border px-3 py-2 text-left text-sm font-semibold transition-colors lg:border-0 lg:border-l-2 lg:py-2.5"
+                style={{
+                  borderRadius: 6,
+                  color: active ? "var(--text)" : "var(--text-muted)",
+                  background: active ? "var(--surface)" : "transparent",
+                  borderColor: active ? "var(--accent)" : "var(--border)",
+                }}
               >
-                {done ? (
-                  <Check size={13} strokeWidth={3} />
-                ) : (
-                  <span className="text-[11px] opacity-70">{i + 1}</span>
-                )}
+                <span
+                  className="grid size-5 shrink-0 place-items-center text-[10px] font-bold"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    borderRadius: 4,
+                    background: done ? tone : "transparent",
+                    border: `1.5px solid ${tone}`,
+                    color: done ? "var(--bg)" : tone,
+                  }}
+                >
+                  {done ? <Check size={11} strokeWidth={3.5} /> : i + 1}
+                </span>
                 {s.label}
               </button>
             </li>

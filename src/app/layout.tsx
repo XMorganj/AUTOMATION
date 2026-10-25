@@ -1,24 +1,22 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Sidebar } from "@/components/Sidebar";
+import { TopBar } from "@/components/TopBar";
 import { THEME_BOOT_SCRIPT } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "Automation Studio",
-  description: "From idea to published YouTube video, in one studio.",
+  title: "MA Studio",
+  description: "Morgan Automation Studio: from idea to published YouTube video.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" data-theme="dark" data-accent="ember" suppressHydrationWarning>
+    <html lang="en" data-theme="dark" data-accent="signal" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body>
-        <div className="mx-auto flex min-h-dvh max-w-[1500px] gap-6 p-3 md:p-5">
-          <Sidebar />
-          <main className="min-w-0 flex-1 pb-24 md:pb-6">{children}</main>
-        </div>
+        <TopBar />
+        <main className="mx-auto min-w-0 max-w-[1400px] px-4 pb-28 pt-6 md:px-5 md:pb-10 md:pt-8">{children}</main>
       </body>
     </html>
   );
