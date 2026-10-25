@@ -1,4 +1,5 @@
 import "server-only";
+import { recordUsage } from "./usage";
 
 /**
  * Text generation for ideas, scripts, fact checks and image prompts. Server-side only: keys never reach the browser.
@@ -91,7 +92,8 @@ async function callAnthropic({ prompt, systemPrompt, maxTokens }: GenerateOption
     const body = await res.text().catch(() => "");
     throw new AiError(`The AI service returned ${res.status}. ${body.slice(0, 160)}`.trim(), res.status === 429 || res.status === 401 ? res.status : 502);
   }
-  const data = (await res.json()) as { content?: { type: string; text?: string }[] };
+  const data = (await res.json()) as { content?: { type: string; text?: string }[]; usage?: { input_tokens?: number; output_tokens?: number } };
+  recordUsage("anthropic", data.usage?.input_tokens ?? 0, data.usage?.output_tokens ?? 0);
   const text = (data.content ?? []).filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
   if (!text.trim()) throw new AiError("The AI returned an empty reply. Try again.", 502);
   return text;
@@ -125,7 +127,8 @@ async function callOllama({ prompt, systemPrompt, maxTokens }: GenerateOptions):
     const body = await res.text().catch(() => "");
     throw new AiError(`Ollama returned ${res.status}. ${body.slice(0, 160)}`.trim(), 502);
   }
-  const data = (await res.json()) as { message?: { content?: string } };
+  const data = (await res.json()) as { message?: { content?: string }; prompt_eval_count?: number; eval_count?: number };
+  recordUsage("ollama", data.prompt_eval_count ?? 0, data.eval_count ?? 0);
   const text = data.message?.content ?? "";
   if (!text.trim()) throw new AiError("The AI returned an empty reply. Try again.", 502);
   return text;

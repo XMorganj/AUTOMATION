@@ -41,7 +41,8 @@ export const WORDS_PER_SHOT = 15;
 
 export function lengthStats(minutes: number) {
   const words = Math.round(minutes * WORDS_PER_MIN);
-  return { words, images: Math.round(words / WORDS_PER_SHOT) };
+  // about 5.8 characters per word once spaces and punctuation are counted; ElevenLabs bills per character
+  return { words, images: Math.round(words / WORDS_PER_SHOT), chars: Math.round(words * 5.8) };
 }
 
 /** The ten steps grouped into four stages, for the pipeline board. */
