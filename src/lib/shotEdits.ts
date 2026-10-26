@@ -1,4 +1,4 @@
-import { HOLD_MAX, SPEED_MAX, SPEED_MIN, type ShotEdit } from "./renderShared";
+import { HOLD_MAX, SPEED_MAX, SPEED_MIN, type Overlay, type ShotEdit } from "./renderShared";
 import { updateVideo } from "./videos";
 
 /** Merge a change into one shot's edit, dropping values that are just the defaults so the saved data stays small. */
@@ -16,4 +16,15 @@ export function mergeShotEdit(all: Record<number, ShotEdit> | undefined, n: numb
 
 export function setShotEdit(videoId: string, n: number, patch: ShotEdit) {
   updateVideo(videoId, (v) => ({ shotEdits: mergeShotEdit(v.shotEdits, n, patch) }));
+}
+
+/** Save (or clear, when the text is empty) the words laid over one shot. Keeps the person's text exactly as typed while editing. */
+export function setShotOverlay(videoId: string, n: number, patch: Partial<Overlay>) {
+  updateVideo(videoId, (v) => {
+    const cur: Overlay = Object.assign({ text: "", place: "lower", when: "intro" }, (v.shotOverlays ?? {})[n], patch) as Overlay;
+    const all = { ...(v.shotOverlays ?? {}) };
+    if (cur.text.trim() === "" ) delete all[n];
+    else all[n] = cur;
+    return { shotOverlays: all };
+  });
 }

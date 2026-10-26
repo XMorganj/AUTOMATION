@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Layers } from "lucide-react";
-import { HOLD_MAX, SPEED_MAX, SPEED_MIN, TRANSITIONS, planTimeline, resolveEdit, type TransitionId } from "@/lib/renderShared";
-import { setShotEdit } from "@/lib/shotEdits";
+import { HOLD_MAX, MAX_OVERLAY_CHARS, OVERLAY_PLACES, OVERLAY_WHEN, type OverlayPlace, type OverlayWhen, SPEED_MAX, SPEED_MIN, TRANSITIONS, planTimeline, resolveEdit, type TransitionId } from "@/lib/renderShared";
+import { setShotEdit, setShotOverlay } from "@/lib/shotEdits";
 import type { Shot, Video } from "@/lib/videos";
 
 const pad = (n: number) => String(n).padStart(3, "0");
@@ -50,6 +50,7 @@ export function Timeline({
   const edit = selIndex >= 0 ? edits[selIndex] : null;
   const shot = selIndex >= 0 ? shots[selIndex] : null;
   const stored = shot ? video.shotEdits?.[shot.n] : undefined;
+  const ov = shot ? video.shotOverlays?.[shot.n] : undefined;
 
   return (
     <section aria-label="Timeline" data-testid="timeline" className="glass p-4">
@@ -122,6 +123,11 @@ export function Timeline({
                     <span className="badge absolute left-1 top-1" style={{ background: "rgba(0,0,0,.65)", color: "#fff" }}>
                       {pad(s.n)}
                     </span>
+                    {video.shotOverlays?.[s.n]?.text && (
+                      <span data-testid={`tl-text-${s.n}`} className="badge absolute right-1 top-1" style={{ background: "rgba(0,0,0,.65)", color: "#fff" }} title="On-screen text">
+                        T
+                      </span>
+                    )}
                     {(e.speed !== 1 || e.transition === "dip" || e.transition === "flash") && (
                       <span className="badge absolute bottom-1 left-1" style={{ background: "rgba(0,0,0,.65)", color: "#fff" }}>
                         {e.speed !== 1 ? `${e.speed}×` : ""}
@@ -182,6 +188,33 @@ export function Timeline({
               onChange={(e) => setShotEdit(video.id, shot.n, { speed: Number(e.target.value) })}
             />
           </label>
+          <div className="sm:col-span-3">
+            <label className="text-xs text-[var(--text-muted)]">
+              On-screen text for shot {shot.n}
+              <input
+                className="input mt-1 !text-xs"
+                maxLength={MAX_OVERLAY_CHARS}
+                placeholder="A title, a name or a number to show over this shot (optional)"
+                value={ov?.text ?? ""}
+                onChange={(e) => setShotOverlay(video.id, shot.n, { text: e.target.value })}
+              />
+            </label>
+            {ov?.text && (
+              <div className="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="On-screen text placement">
+                {OVERLAY_PLACES.map((pl) => (
+                  <button key={pl.id} className="pill" data-active={ov.place === pl.id} aria-pressed={ov.place === pl.id} onClick={() => setShotOverlay(video.id, shot.n, { place: pl.id as OverlayPlace })}>
+                    {pl.label}
+                  </button>
+                ))}
+                <span className="mx-1 text-[var(--border-strong)]">|</span>
+                {OVERLAY_WHEN.map((w) => (
+                  <button key={w.id} className="pill" data-active={ov.when === w.id} aria-pressed={ov.when === w.id} onClick={() => setShotOverlay(video.id, shot.n, { when: w.id as OverlayWhen })}>
+                    {w.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </section>

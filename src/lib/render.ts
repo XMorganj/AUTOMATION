@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { ChildProcess } from "node:child_process";
-import { buildAss } from "./captions";
+import { buildAss, buildOverlayAss } from "./captions";
 import { ffmpegAvailable, probeVideo, runFfmpeg } from "./ffmpeg";
 import { musicPath, shotAudioForRender } from "./audioStorage";
 import { RESOLUTIONS, planTimeline, type ResolvedEdit, type RenderJob, type RenderOutput, type RenderPlan, type RenderState } from "./renderShared";
@@ -92,6 +92,7 @@ interface ShotInput {
   n: number;
   motion: RenderPlan["shots"][number]["motion"];
   edit: ResolvedEdit;
+  overlay?: RenderPlan["shots"][number]["overlay"];
   image: string;
   audio: string;
   duration: number;
@@ -110,6 +111,7 @@ async function gather(videoId: string, plan: RenderPlan): Promise<Gathered> {
       n: s.n,
       motion: s.motion,
       edit: { speed: s.speed, hold: s.hold, transition: s.transition, tlen: s.tlen },
+      overlay: s.overlay,
       image,
       audio: audio.file,
       duration: audio.duration,
@@ -211,11 +213,13 @@ async function run(l: Live, plan: RenderPlan, shots: ShotInput[], music: string 
       const words = sp === 1 ? p.words : p.words.map((x) => ({ ...x, s: x.s / sp, e: x.e / sp }));
       const ass = plan.captions === "off" ? "" : buildAss(words, plan.captions, FONT, p.outSeconds);
       if (ass) await fs.writeFile(path.join(work, `cap-${tag}.ass`), ass);
+      const ovAss = p.overlay ? buildOverlayAss(p.overlay, p.outSeconds, FONT) : "";
+      if (ovAss) await fs.writeFile(path.join(work, `ov-${tag}.ass`), ovAss);
 
       // the picture for this shot, with its captions
       const z = zoompanExpr(p.motion, plan.intensity, p.frames);
       const cross = p.inOverlap > 0 && prev;
-      let graph = `${still(0, p.frames, z)}${ass ? `,ass=cap-${tag}.ass` : ""}[vb]`;
+      let graph = `${still(0, p.frames, z)}${ass ? `,ass=cap-${tag}.ass` : ""}${ovAss ? `,ass=ov-${tag}.ass` : ""}[vb]`;
       const inputs = ["-i", p.image, "-i", p.audio];
 
       if (cross) {

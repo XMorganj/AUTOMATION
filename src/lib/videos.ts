@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { STEP_IDS, type StepId, type StepStatus } from "./pipeline";
 import type { Intensity, MotionId } from "./motion";
 import type { VoiceChoice } from "./voice";
-import type { RenderOptions, ShotEdit, TransitionDefault } from "./renderShared";
+import type { Overlay, RenderOptions, ShotEdit, TransitionDefault } from "./renderShared";
 import type { SeoData } from "./seoShared";
 
 export interface Idea {
@@ -66,6 +66,8 @@ export interface Video {
   transition?: TransitionDefault;
   /** per-shot pause, narration speed and transition, only for shots changed by hand */
   shotEdits?: Record<number, ShotEdit>;
+  /** words laid over a shot's picture, by shot number */
+  shotOverlays?: Record<number, Overlay>;
   /** set when the video has been uploaded to YouTube */
   youtube?: { id: string; privacy: string; uploadedAt: number; publishAt?: string };
   motionIntensity?: Intensity;
