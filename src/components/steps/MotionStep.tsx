@@ -7,6 +7,7 @@ import { WORDS_PER_MIN } from "@/lib/pipeline";
 import { countWords } from "@/lib/shots";
 import { useStoredImages } from "@/lib/useStoredImages";
 import { HOLD_MAX, MAX_TLEN, MIN_TLEN, SPEED_MAX, SPEED_MIN, TRANSITIONS, type ShotEdit, type TransitionId } from "@/lib/renderShared";
+import { mergeShotEdit } from "@/lib/shotEdits";
 import { updateVideo, type Shot, type Video } from "@/lib/videos";
 import { NeedsPrompts, NeedsScript } from "./notices";
 
@@ -72,17 +73,7 @@ export function MotionStep({ video }: { video: Video }) {
   }
 
   function setEdit(n: number, patch: ShotEdit) {
-    updateVideo(video.id, (v) => {
-      const cur = { ...(v.shotEdits ?? {})[n], ...patch };
-      const clean: ShotEdit = {};
-      if (cur.speed !== undefined && cur.speed !== 1) clean.speed = cur.speed;
-      if (cur.hold !== undefined && cur.hold !== 0) clean.hold = cur.hold;
-      if (cur.transition !== undefined) clean.transition = cur.transition;
-      const all = { ...(v.shotEdits ?? {}) };
-      if (Object.keys(clean).length) all[n] = clean;
-      else delete all[n];
-      return { shotEdits: all, steps: touch(v) };
-    });
+    updateVideo(video.id, (v) => ({ shotEdits: mergeShotEdit(v.shotEdits, n, patch), steps: touch(v) }));
   }
 
   function shuffle() {

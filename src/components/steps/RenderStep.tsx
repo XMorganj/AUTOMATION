@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, Download, Film, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { ApiError, postJson } from "@/lib/api";
 import { autoMotion, seedFromId, type Intensity, type MotionId } from "@/lib/motion";
+import { Timeline } from "@/components/Timeline";
 import { CAPTION_OPTIONS, DEFAULT_RENDER_OPTIONS, RESOLUTIONS, planTimeline, resolveEdit, type RenderOptions, type RenderPlan, type RenderState } from "@/lib/renderShared";
 import { hashText } from "@/lib/shots";
 import { useStoredImages } from "@/lib/useStoredImages";
@@ -254,6 +255,14 @@ function Loaded({ video, shots }: { video: Video; shots: NonNullable<Video["shot
           )}
         </div>
       </div>
+
+      <Timeline
+        video={video}
+        shots={shots}
+        durations={Object.fromEntries(shots.map((s) => [s.n, meta[s.n]?.duration]))}
+        imageVersions={Object.fromEntries(shots.map((s) => [s.n, images[s.n]?.mtime]))}
+        fps={fps}
+      />
 
       <p className="text-xs text-[var(--text-muted)]">
         {shots.length} shots · about {mmss(lengthEstimate)} long · {resInfo?.label} {fps} fps. Images that aren&apos;t 16:9 are cropped to fit.
