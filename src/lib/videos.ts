@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { STEP_IDS, type StepId, type StepStatus } from "./pipeline";
 import type { Intensity, MotionId } from "./motion";
 import type { VoiceChoice } from "./voice";
-import type { RenderOptions } from "./renderShared";
+import type { RenderOptions, ShotEdit, TransitionDefault } from "./renderShared";
 import type { SeoData } from "./seoShared";
 
 export interface Idea {
@@ -62,6 +62,10 @@ export interface Video {
   renderOptions?: Partial<RenderOptions>;
   /** the choices made on the Upload screen, so a reload or a second upload keeps them */
   uploadSettings?: { privacy: "private" | "unlisted" | "public" | "schedule"; categoryId: string; kids: boolean | null; ai: boolean };
+  /** how shots join by default (the first shot has nothing before it) */
+  transition?: TransitionDefault;
+  /** per-shot pause, narration speed and transition, only for shots changed by hand */
+  shotEdits?: Record<number, ShotEdit>;
   /** set when the video has been uploaded to YouTube */
   youtube?: { id: string; privacy: string; uploadedAt: number; publishAt?: string };
   motionIntensity?: Intensity;

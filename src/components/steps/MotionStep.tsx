@@ -6,6 +6,7 @@ import { EASE_CSS, INTENSITIES, MOTIONS, autoMotion, motionPath, seedFromId, vie
 import { WORDS_PER_MIN } from "@/lib/pipeline";
 import { countWords } from "@/lib/shots";
 import { useStoredImages } from "@/lib/useStoredImages";
+import { HOLD_MAX, MAX_TLEN, MIN_TLEN, SPEED_MAX, SPEED_MIN, TRANSITIONS, type ShotEdit, type TransitionId } from "@/lib/renderShared";
 import { updateVideo, type Shot, type Video } from "@/lib/videos";
 import { NeedsPrompts, NeedsScript } from "./notices";
 
@@ -39,6 +40,7 @@ export function MotionStep({ video }: { video: Video }) {
   const withoutImage = loaded ? shots.filter((s) => !images[s.n]).length : 0;
   const changed = Object.keys(overrides).filter((n) => Number(n) <= shots.length).length;
 
+  const changedEdits = Object.keys(video.shotEdits ?? {}).length;
   const touch = (v: Video) => ({ ...v.steps, motion: v.steps.motion === "approved" ? "approved" : "ready" }) as Video["steps"];
 
   function setIntensity(i: Intensity) {
@@ -47,6 +49,40 @@ export function MotionStep({ video }: { video: Video }) {
 
   function setMotion(n: number, id: MotionId) {
     updateVideo(video.id, (v) => ({ motionOverrides: { ...(v.motionOverrides ?? {}), [n]: id }, steps: touch(v) }));
+  }
+
+  const tDefault = video.transition ?? { style: "cut" as TransitionId, length: 0.3 };
+  const edits = video.shotEdits ?? {};
+
+  function setTransition(style: TransitionId, length: number) {
+    updateVideo(video.id, (v) => ({ transition: { style, length }, steps: touch(v) }));
+  }
+
+  /** apply one style to every shot, dropping hand-picked styles */
+  function applyAll(style: TransitionId) {
+    updateVideo(video.id, (v) => {
+      const next: Record<number, ShotEdit> = {};
+      for (const [k, e] of Object.entries(v.shotEdits ?? {})) {
+        const { transition: _t, ...rest } = e;
+        void _t;
+        if (Object.keys(rest).length) next[Number(k)] = rest;
+      }
+      return { transition: { style, length: v.transition?.length ?? 0.3 }, shotEdits: next, steps: touch(v) };
+    });
+  }
+
+  function setEdit(n: number, patch: ShotEdit) {
+    updateVideo(video.id, (v) => {
+      const cur = { ...(v.shotEdits ?? {})[n], ...patch };
+      const clean: ShotEdit = {};
+      if (cur.speed !== undefined && cur.speed !== 1) clean.speed = cur.speed;
+      if (cur.hold !== undefined && cur.hold !== 0) clean.hold = cur.hold;
+      if (cur.transition !== undefined) clean.transition = cur.transition;
+      const all = { ...(v.shotEdits ?? {}) };
+      if (Object.keys(clean).length) all[n] = clean;
+      else delete all[n];
+      return { shotEdits: all, steps: touch(v) };
+    });
   }
 
   function shuffle() {
@@ -87,6 +123,36 @@ export function MotionStep({ video }: { video: Video }) {
         </p>
       </div>
 
+      <div>
+        <h3 className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-faint)]">Between shots</h3>
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Transition between shots">
+          {TRANSITIONS.map((t) => (
+            <button key={t.id} className="pill" title={t.hint} data-active={tDefault.style === t.id} aria-pressed={tDefault.style === t.id} onClick={() => setTransition(t.id, tDefault.length)}>
+              {t.label}
+            </button>
+          ))}
+          <button className="btn" onClick={() => applyAll(tDefault.style)} disabled={changedEdits === 0}>
+            Apply to all shots
+          </button>
+          <label className="ml-2 flex items-center gap-2 text-xs text-[var(--text-muted)]">
+            Length
+            <input
+              type="range"
+              aria-label="Transition length"
+              min={MIN_TLEN}
+              max={MAX_TLEN}
+              step={0.05}
+              value={tDefault.length}
+              onChange={(e) => setTransition(tDefault.style, Number(e.target.value))}
+            />
+            {tDefault.length.toFixed(2)}s
+          </label>
+        </div>
+        <p className="mt-1 text-[11px] text-[var(--text-faint)]">
+          Crossfades use the quiet gap after each line, so the voice is never cut. Pause adds time after a line; speed changes narration pace (pitch kept).
+        </p>
+      </div>
+
       <p className="text-xs text-[var(--text-muted)]">
         Hover a shot, or press its play button, to preview the move. The final video uses exactly this movement.
       </p>
@@ -107,6 +173,10 @@ export function MotionStep({ video }: { video: Video }) {
             motion={motionFor(s.n)}
             intensity={intensity}
             onChange={setMotion}
+            edit={edits[s.n]}
+            first={s.n === shots[0].n}
+            defaultStyle={tDefault.style}
+            onEdit={setEdit}
           />
         ))}
       </ul>
@@ -128,6 +198,10 @@ const ShotCard = memo(function ShotCard({
   motion,
   intensity,
   onChange,
+  edit,
+  first,
+  defaultStyle,
+  onEdit,
 }: {
   shot: Shot;
   videoId: string;
@@ -135,6 +209,10 @@ const ShotCard = memo(function ShotCard({
   motion: MotionId;
   intensity: Intensity;
   onChange: (n: number, id: MotionId) => void;
+  edit: ShotEdit | undefined;
+  first: boolean;
+  defaultStyle: TransitionId;
+  onEdit: (n: number, patch: ShotEdit) => void;
 }) {
   const moverRef = useRef<HTMLDivElement>(null);
   const anim = useRef<Animation | null>(null);
@@ -224,7 +302,50 @@ const ShotCard = memo(function ShotCard({
             </option>
           ))}
         </select>
-        <p className="mt-1 px-0.5 text-[11px] text-[var(--text-faint)]">~{shotSeconds(shot.narration).toFixed(1)}s</p>
+        {!first && (
+          <select
+            aria-label={`Transition into shot ${shot.n}`}
+            className="input mt-1 !px-2.5 !py-1.5 !text-xs"
+            value={edit?.transition ?? ""}
+            onChange={(e) => onEdit(shot.n, { transition: (e.target.value || undefined) as TransitionId | undefined })}
+          >
+            <option value="">Into: {TRANSITIONS.find((t) => t.id === defaultStyle)?.label} (default)</option>
+            {TRANSITIONS.map((t) => (
+              <option key={t.id} value={t.id}>
+                Into: {t.label}
+              </option>
+            ))}
+          </select>
+        )}
+        <div className="mt-1 grid grid-cols-2 gap-1.5">
+          <label className="text-[11px] text-[var(--text-faint)]">
+            Pause
+            <input
+              type="number"
+              aria-label={`Pause after shot ${shot.n} in seconds`}
+              className="input !px-2 !py-1 !text-xs"
+              min={0}
+              max={HOLD_MAX}
+              step={0.5}
+              value={edit?.hold ?? 0}
+              onChange={(e) => onEdit(shot.n, { hold: Math.min(HOLD_MAX, Math.max(0, Number(e.target.value) || 0)) })}
+            />
+          </label>
+          <label className="text-[11px] text-[var(--text-faint)]">
+            Speed
+            <input
+              type="number"
+              aria-label={`Narration speed for shot ${shot.n}`}
+              className="input !px-2 !py-1 !text-xs"
+              min={SPEED_MIN}
+              max={SPEED_MAX}
+              step={0.05}
+              value={edit?.speed ?? 1}
+              onChange={(e) => onEdit(shot.n, { speed: Math.min(SPEED_MAX, Math.max(SPEED_MIN, Number(e.target.value) || 1)) })}
+            />
+          </label>
+        </div>
+        <p className="mt-1 px-0.5 text-[11px] text-[var(--text-faint)]">~{(shotSeconds(shot.narration) / (edit?.speed ?? 1) + (edit?.hold ?? 0)).toFixed(1)}s</p>
       </div>
     </li>
   );

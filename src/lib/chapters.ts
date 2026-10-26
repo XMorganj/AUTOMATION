@@ -1,4 +1,4 @@
-import { shotFrames } from "./renderShared";
+import { planTimeline, type ResolvedEdit } from "./renderShared";
 
 export interface ChapterDraft {
   /** the shot this chapter begins at */
@@ -11,15 +11,16 @@ export interface Chapter extends ChapterDraft {
   time: number;
 }
 
-/** When each shot begins in the rendered video, in seconds. `durations` is each shot's narration length, in shot order. */
-export function shotStarts(durations: number[], fps: number): number[] {
-  const out: number[] = [];
-  let frames = 0;
-  durations.forEach((d, i) => {
-    out.push(frames / fps);
-    frames += shotFrames(d, i === durations.length - 1, fps);
-  });
-  return out;
+/**
+ * When each shot begins in the rendered video, in seconds. `durations` is each shot's narration length, in shot order;
+ * `edits` (same order) carries any pause, narration speed or crossfade the person chose.
+ */
+export function shotStarts(durations: number[], fps: number, edits?: ResolvedEdit[]): number[] {
+  const plain: ResolvedEdit = { speed: 1, hold: 0, transition: "cut", tlen: 0.3 };
+  return planTimeline(
+    durations.map((duration, i) => ({ duration, edit: edits?.[i] ?? plain })),
+    fps,
+  ).starts;
 }
 
 export function stamp(sec: number): string {
