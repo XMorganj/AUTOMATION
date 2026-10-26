@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, Check, CheckCircle2, Copy, Loader2, Plus, Sparkles, X } from "lucide-react";
 import { ApiError, copyText, postJson } from "@/lib/api";
 import { buildChapters, chapterLines, shotStarts, stamp, type ChapterDraft } from "@/lib/chapters";
-import { DEFAULT_RENDER_OPTIONS } from "@/lib/renderShared";
+import { DEFAULT_RENDER_OPTIONS, resolveEdit } from "@/lib/renderShared";
 import {
   DESCRIPTION_MAX,
   TAGS_MAX_CHARS,
@@ -46,8 +46,11 @@ export function SeoStep({ video }: { video: Video }) {
   const { starts, haveTimes } = useMemo(() => {
     const durations = shots.map((s) => meta[s.n]?.duration);
     const have = audioLoaded && shots.length > 0 && durations.every((d) => typeof d === "number");
-    return { haveTimes: have, starts: have ? shotStarts(durations as number[], fps) : [] };
-  }, [shots, meta, audioLoaded, fps]);
+    return {
+      haveTimes: have,
+      starts: have ? shotStarts(durations as number[], fps, shots.map((s, i) => resolveEdit(video.transition, video.shotEdits?.[s.n], i === 0))) : [],
+    };
+  }, [shots, meta, audioLoaded, fps, video.transition, video.shotEdits]);
   const shotIndex = useMemo(() => new Map(shots.map((s, i) => [s.n, i])), [shots]);
 
   // chapters in shot-index terms (buildChapters wants 1..N positions), then back to the real shot numbers

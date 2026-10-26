@@ -6,7 +6,7 @@ import type { ChildProcess } from "node:child_process";
 import { buildAss } from "./captions";
 import { ffmpegAvailable, probeVideo, runFfmpeg } from "./ffmpeg";
 import { musicPath, shotAudioForRender } from "./audioStorage";
-import { RESOLUTIONS, shotFrames, type RenderJob, type RenderOutput, type RenderPlan, type RenderState } from "./renderShared";
+import { RESOLUTIONS, planTimeline, type ResolvedEdit, type RenderJob, type RenderOutput, type RenderPlan, type RenderState } from "./renderShared";
 import { imagePath, videoDir } from "./storage";
 import { zoompanExpr } from "./zoompan";
 
@@ -91,6 +91,7 @@ type Gathered = { shots: ShotInput[]; error?: undefined } | { error: string; sho
 interface ShotInput {
   n: number;
   motion: RenderPlan["shots"][number]["motion"];
+  edit: ResolvedEdit;
   image: string;
   audio: string;
   duration: number;
@@ -105,7 +106,15 @@ async function gather(videoId: string, plan: RenderPlan): Promise<Gathered> {
     const [image, audio] = await Promise.all([imagePath(videoId, s.n), shotAudioForRender(videoId, s.n)]);
     if (!image) missingImages.push(s.n);
     if (!audio) missingAudio.push(s.n);
-    if (image && audio) shots.push({ n: s.n, motion: s.motion, image, audio: audio.file, duration: audio.duration, words: audio.words });
+    if (image && audio) shots.push({
+      n: s.n,
+      motion: s.motion,
+      edit: { speed: s.speed, hold: s.hold, transition: s.transition, tlen: s.tlen },
+      image,
+      audio: audio.file,
+      duration: audio.duration,
+      words: audio.words,
+    });
   }
   const list = (a: number[]) => (a.length > 6 ? `${a.slice(0, 6).join(", ")} and ${a.length - 6} more` : a.join(", "));
   if (missingImages.length) return { error: `Shot ${list(missingImages)} ${missingImages.length > 1 ? "have" : "has"} no image yet. Add ${missingImages.length > 1 ? "them" : "it"} in the Images step.` };
@@ -163,12 +172,16 @@ async function run(l: Live, plan: RenderPlan, shots: ShotInput[], music: string 
     await fs.mkdir(work, { recursive: true });
 
     // length of each clip, in whole frames so audio and video stay locked
-    const plans = shots.map((s, i) => {
-      const frames = shotFrames(s.duration, i === shots.length - 1, fps);
-      return { ...s, frames, seconds: frames / fps };
-    });
-    const totalFrames = plans.reduce((n, p) => n + p.frames, 0);
-    const totalSeconds = plans.reduce((n, p) => n + p.seconds, 0);
+    const tl = planTimeline(shots.map((s) => ({ duration: s.duration, edit: s.edit })), fps);
+    const plans = shots.map((s, i) => ({
+      ...s,
+      frames: tl.frames[i],
+      outFrames: tl.outFrames[i],
+      inOverlap: tl.inOverlap[i],
+      outSeconds: tl.outFrames[i] / fps,
+    }));
+    const totalFrames = tl.totalFrames;
+    const totalSeconds = totalFrames / fps;
     const SHOTS_SHARE = 0.9;
     let framesDone = 0;
 
@@ -176,6 +189,9 @@ async function run(l: Live, plan: RenderPlan, shots: ShotInput[], music: string 
     const k = plan.resolution === 2160 ? 1.25 : 2;
     const bw = Math.round((w * k) / 2) * 2;
     const bh = Math.round((h * k) / 2) * 2;
+    const still = (input: number, frames: number, z: { z: string; x: string; y: string }) =>
+      `[${input}:v]scale=${bw}:${bh}:force_original_aspect_ratio=increase:flags=lanczos,crop=${bw}:${bh},` +
+      `zoompan=z='${z.z}':x='${z.x}':y='${z.y}':d=${frames}:s=${w}x${h}:fps=${fps},setsar=1,format=yuv420p`;
 
     const videoList: string[] = [];
     const audioList: string[] = [];
@@ -183,42 +199,68 @@ async function run(l: Live, plan: RenderPlan, shots: ShotInput[], music: string 
     for (let i = 0; i < plans.length; i++) {
       check();
       const p = plans[i];
+      const prev = i > 0 ? plans[i - 1] : null;
+      const next = i < plans.length - 1 ? plans[i + 1] : null;
       const tag = String(p.n).padStart(4, "0");
       job.phase = `Rendering shot ${i + 1} of ${plans.length}`;
       job.shotsDone = i;
       await save();
 
-      const ass = plan.captions === "off" ? "" : buildAss(p.words, plan.captions, FONT, p.seconds);
+      // captions follow the narration, which may have been sped up or slowed down
+      const sp = p.edit.speed;
+      const words = sp === 1 ? p.words : p.words.map((x) => ({ ...x, s: x.s / sp, e: x.e / sp }));
+      const ass = plan.captions === "off" ? "" : buildAss(words, plan.captions, FONT, p.outSeconds);
       if (ass) await fs.writeFile(path.join(work, `cap-${tag}.ass`), ass);
 
+      // the picture for this shot, with its captions
       const z = zoompanExpr(p.motion, plan.intensity, p.frames);
-      const video =
-        `[0:v]scale=${bw}:${bh}:force_original_aspect_ratio=increase:flags=lanczos,crop=${bw}:${bh},` +
-        `zoompan=z='${z.z}':x='${z.x}':y='${z.y}':d=${p.frames}:s=${w}x${h}:fps=${fps},setsar=1,format=yuv420p` +
-        (ass ? `,ass=cap-${tag}.ass` : "") +
-        `[v]`;
-      const audio = `[1:a]aresample=${AUDIO_RATE},aformat=channel_layouts=stereo,apad=whole_dur=${p.seconds.toFixed(6)},atrim=0:${p.seconds.toFixed(6)}[a]`;
+      const cross = p.inOverlap > 0 && prev;
+      let graph = `${still(0, p.frames, z)}${ass ? `,ass=cap-${tag}.ass` : ""}[vb]`;
+      const inputs = ["-i", p.image, "-i", p.audio];
+
+      if (cross) {
+        // the previous picture keeps moving for a moment and dissolves into this one
+        inputs.push("-i", prev.image);
+        const pz = zoompanExpr(prev.motion, plan.intensity, prev.frames, prev.frames - p.inOverlap);
+        graph += `;${still(2, p.inOverlap, pz)}[va];[va][vb]xfade=transition=fade:duration=${(p.inOverlap / fps).toFixed(6)}:offset=0[vx]`;
+      } else {
+        graph += `;[vb]null[vx]`;
+      }
+      // dip to black / flash through white: this shot fades in, and the one before faded out
+      const fadeLen = Math.max(1, Math.round(p.edit.tlen * fps));
+      const colour = (t: ResolvedEdit["transition"]) => (t === "flash" ? "white" : "black");
+      const fades: string[] = [];
+      if (prev && (p.edit.transition === "dip" || p.edit.transition === "flash")) {
+        fades.push(`fade=t=in:s=0:n=${fadeLen}:color=${colour(p.edit.transition)}`);
+      }
+      if (next && (next.edit.transition === "dip" || next.edit.transition === "flash")) {
+        const n = Math.min(fadeLen, p.outFrames);
+        fades.push(`fade=t=out:s=${Math.max(0, p.outFrames - n)}:n=${n}:color=${colour(next.edit.transition)}`);
+      }
+      graph += `;[vx]${fades.length ? fades.join(",") : "null"}[v]`;
+
+      const tempo = Math.abs(sp - 1) > 0.001 ? `atempo=${sp.toFixed(4)},` : "";
+      const audio = `[1:a]${tempo}aresample=${AUDIO_RATE},aformat=channel_layouts=stereo,apad=whole_dur=${p.outSeconds.toFixed(6)},atrim=0:${p.outSeconds.toFixed(6)}[a]`;
 
       const before = framesDone;
       await runFfmpeg(
         [
-          "-i", p.image,
-          "-i", p.audio,
-          "-filter_complex", `${video};${audio}`,
-          "-map", "[v]", "-frames:v", String(p.frames),
+          ...inputs,
+          "-filter_complex", `${graph};${audio}`,
+          "-map", "[v]", "-frames:v", String(p.outFrames), "-t", p.outSeconds.toFixed(6),
           "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p", "-r", String(fps), "-g", String(fps * 2), "-an",
           `clip-${tag}.mp4`,
-          "-map", "[a]", "-c:a", "pcm_s16le", `aud-${tag}.wav`,
+          "-map", "[a]", "-c:a", "pcm_s16le", "-t", p.outSeconds.toFixed(6), `aud-${tag}.wav`,
         ],
         {
           cwd: work,
           onStart: (c) => track(l, c),
           onFrame: (f) => {
-            job.progress = ((before + Math.min(f, p.frames)) / totalFrames) * SHOTS_SHARE;
+            job.progress = ((before + Math.min(f, p.outFrames)) / totalFrames) * SHOTS_SHARE;
           },
         },
       );
-      framesDone += p.frames;
+      framesDone += p.outFrames;
       job.progress = (framesDone / totalFrames) * SHOTS_SHARE;
       videoList.push(`file 'clip-${tag}.mp4'`);
       audioList.push(`file 'aud-${tag}.wav'`);
@@ -249,7 +291,7 @@ async function run(l: Live, plan: RenderPlan, shots: ShotInput[], music: string 
       }
       last = "[mix]";
     }
-    filters.push(`${last}${plan.loudness ? `loudnorm=I=-16:TP=-1.5:LRA=11,aresample=${AUDIO_RATE},` : ""}atrim=0:${T},asetpts=N/SR/TB[aout]`);
+    filters.push(`${last}${plan.loudness ? `loudnorm=I=-16:TP=-1.5:LRA=11,aresample=${AUDIO_RATE},` : ""}asetpts=N/SR/TB,apad=whole_dur=${T},atrim=0:${T}[aout]`);
 
     const tmp = path.join(root, "video.tmp.mp4");
     await runFfmpeg(
@@ -290,7 +332,7 @@ async function run(l: Live, plan: RenderPlan, shots: ShotInput[], music: string 
   } finally {
     job.finishedAt = Date.now();
     l.child = null;
-    await fs.rm(work, { recursive: true, force: true }).catch(() => {});
+    if (!process.env.KEEP_WORK) await fs.rm(work, { recursive: true, force: true }).catch(() => {});
     await save();
   }
 }

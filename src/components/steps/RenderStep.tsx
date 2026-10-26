@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, Download, Film, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { ApiError, postJson } from "@/lib/api";
 import { autoMotion, seedFromId, type Intensity, type MotionId } from "@/lib/motion";
-import { CAPTION_OPTIONS, DEFAULT_RENDER_OPTIONS, RESOLUTIONS, type RenderOptions, type RenderPlan, type RenderState } from "@/lib/renderShared";
+import { CAPTION_OPTIONS, DEFAULT_RENDER_OPTIONS, RESOLUTIONS, planTimeline, resolveEdit, type RenderOptions, type RenderPlan, type RenderState } from "@/lib/renderShared";
 import { hashText } from "@/lib/shots";
 import { useStoredImages } from "@/lib/useStoredImages";
 import { updateVideo, type Video } from "@/lib/videos";
@@ -96,7 +96,14 @@ function Loaded({ video, shots }: { video: Video; shots: NonNullable<Video["shot
   const missingAudio = audioLoaded ? shots.filter((s) => !meta[s.n]).map((s) => s.n) : [];
   const ready = imagesLoaded && audioLoaded && missingImages.length === 0 && missingAudio.length === 0;
   const narrationSeconds = shots.reduce((sum, s) => sum + (meta[s.n]?.duration ?? 0), 0);
-  const lengthEstimate = narrationSeconds + shots.length * 0.35 + 0.65;
+  const edits = video.shotEdits;
+  const transitionDefault = video.transition;
+  const lengthEstimate = audioLoaded && shots.every((s) => meta[s.n])
+    ? planTimeline(
+        shots.map((s, i) => ({ duration: meta[s.n]?.duration ?? 0, edit: resolveEdit(transitionDefault, edits?.[s.n], i === 0) })),
+        fps,
+      ).totalFrames / fps
+    : narrationSeconds + shots.length * 0.35 + 0.65;
 
   const plan = useMemo<Omit<RenderPlan, "fingerprint">>(
     () => {
@@ -108,11 +115,11 @@ function Loaded({ video, shots }: { video: Video; shots: NonNullable<Video["shot
         loudness,
         intensity,
         music: withMusic ? { volume: musicVolume, duck: musicDuck } : null,
-        shots: shots.map((s) => ({ n: s.n, motion: ov[s.n] ?? autoMotion(s.n, seed) })),
+        shots: shots.map((s, i) => ({ n: s.n, motion: ov[s.n] ?? autoMotion(s.n, seed), ...resolveEdit(transitionDefault, edits?.[s.n], i === 0) })),
         title: video.title,
       };
     },
-    [resolution, fps, captions, loudness, intensity, withMusic, musicVolume, musicDuck, shots, overridesKey, seed, video.title],
+    [resolution, fps, captions, loudness, intensity, withMusic, musicVolume, musicDuck, shots, overridesKey, seed, video.title, edits, transitionDefault],
   );
 
   /** Changes whenever anything that ends up in the video changes (settings, motion, images, narration, music). */
