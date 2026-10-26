@@ -5,7 +5,7 @@ import { AlertTriangle, Check, Download, Film, Loader2, RotateCcw, Trash2 } from
 import { ApiError, postJson } from "@/lib/api";
 import { autoMotion, seedFromId, type Intensity, type MotionId } from "@/lib/motion";
 import { Timeline } from "@/components/Timeline";
-import { CAPTION_OPTIONS, DEFAULT_RENDER_OPTIONS, RESOLUTIONS, planTimeline, resolveEdit, type RenderOptions, type RenderPlan, type RenderState } from "@/lib/renderShared";
+import { CAPTION_OPTIONS, DEFAULT_RENDER_OPTIONS, RESOLUTIONS, cleanOverlay, planTimeline, resolveEdit, type RenderOptions, type RenderPlan, type RenderState } from "@/lib/renderShared";
 import { hashText } from "@/lib/shots";
 import { useStoredImages } from "@/lib/useStoredImages";
 import { updateVideo, type Video } from "@/lib/videos";
@@ -98,6 +98,7 @@ function Loaded({ video, shots }: { video: Video; shots: NonNullable<Video["shot
   const ready = imagesLoaded && audioLoaded && missingImages.length === 0 && missingAudio.length === 0;
   const narrationSeconds = shots.reduce((sum, s) => sum + (meta[s.n]?.duration ?? 0), 0);
   const edits = video.shotEdits;
+  const overlays = video.shotOverlays;
   const transitionDefault = video.transition;
   const lengthEstimate = audioLoaded && shots.every((s) => meta[s.n])
     ? planTimeline(
@@ -116,11 +117,11 @@ function Loaded({ video, shots }: { video: Video; shots: NonNullable<Video["shot
         loudness,
         intensity,
         music: withMusic ? { volume: musicVolume, duck: musicDuck } : null,
-        shots: shots.map((s, i) => ({ n: s.n, motion: ov[s.n] ?? autoMotion(s.n, seed), ...resolveEdit(transitionDefault, edits?.[s.n], i === 0) })),
+        shots: shots.map((s, i) => ({ n: s.n, motion: ov[s.n] ?? autoMotion(s.n, seed), ...resolveEdit(transitionDefault, edits?.[s.n], i === 0), ...(cleanOverlay(overlays?.[s.n]) ? { overlay: cleanOverlay(overlays?.[s.n]) } : {}) })),
         title: video.title,
       };
     },
-    [resolution, fps, captions, loudness, intensity, withMusic, musicVolume, musicDuck, shots, overridesKey, seed, video.title, edits, transitionDefault],
+    [resolution, fps, captions, loudness, intensity, withMusic, musicVolume, musicDuck, shots, overridesKey, seed, video.title, edits, transitionDefault, overlays],
   );
 
   /** Changes whenever anything that ends up in the video changes (settings, motion, images, narration, music). */

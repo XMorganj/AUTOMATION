@@ -44,6 +44,34 @@ export interface TransitionDefault {
   style: TransitionId;
   length: number;
 }
+/** Words laid over the picture of one shot: a title, a name, a number. */
+export const OVERLAY_PLACES = [
+  { id: "top", label: "Top" },
+  { id: "middle", label: "Middle" },
+  { id: "lower", label: "Lower third" },
+] as const;
+export type OverlayPlace = (typeof OVERLAY_PLACES)[number]["id"];
+export const OVERLAY_WHEN = [
+  { id: "intro", label: "First 3 seconds" },
+  { id: "shot", label: "Whole shot" },
+] as const;
+export type OverlayWhen = (typeof OVERLAY_WHEN)[number]["id"];
+export const MAX_OVERLAY_CHARS = 100;
+export interface Overlay {
+  text: string;
+  place: OverlayPlace;
+  when: OverlayWhen;
+}
+/** Make an untrusted overlay safe: trimmed text, known place and timing. Returns undefined when there is nothing to show. */
+export function cleanOverlay(o: unknown): Overlay | undefined {
+  const r = (o ?? {}) as Record<string, unknown>;
+  const text = typeof r.text === "string" ? r.text.replace(/\s+/g, " ").trim().slice(0, MAX_OVERLAY_CHARS) : "";
+  if (!text) return undefined;
+  const place = OVERLAY_PLACES.some((x) => x.id === r.place) ? (r.place as OverlayPlace) : "lower";
+  const when = OVERLAY_WHEN.some((x) => x.id === r.when) ? (r.when as OverlayWhen) : "intro";
+  return { text, place, when };
+}
+
 export interface ResolvedEdit {
   speed: number;
   hold: number;
@@ -139,7 +167,7 @@ export interface RenderPlan {
   intensity: Intensity;
   /** null = leave any uploaded music out */
   music: { volume: number; duck: boolean } | null;
-  shots: ({ n: number; motion: MotionId } & ResolvedEdit)[];
+  shots: ({ n: number; motion: MotionId; overlay?: Overlay } & ResolvedEdit)[];
   /** only used to name the download */
   title: string;
   /** the browser's fingerprint of every input, so it can tell later whether the render is out of date */
@@ -208,6 +236,7 @@ export function parsePlan(raw: unknown): { ok: true; plan: RenderPlan } | { ok: 
       hold: clamp(num(s.hold, 0), 0, HOLD_MAX),
       transition: tr,
       tlen: clamp(num(s.tlen, 0.3), MIN_TLEN, MAX_TLEN),
+      ...(cleanOverlay(s.overlay) ? { overlay: cleanOverlay(s.overlay) } : {}),
     });
   }
   shots.sort((a, c) => a.n - c.n);

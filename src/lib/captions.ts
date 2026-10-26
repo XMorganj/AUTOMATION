@@ -94,3 +94,34 @@ export function buildAss(words: WordTiming[], style: CaptionStyle, font = "Poppi
   }
   return out.join("\n") + "\n";
 }
+
+const OVERLAY_ALIGN = { top: 8, middle: 5, lower: 1 } as const;
+
+/**
+ * A title laid over one shot as an ASS file: it fades in and out, and sits above the spoken captions.
+ * Times are relative to the start of the shot's clip.
+ */
+export function buildOverlayAss(o: { text: string; place: "top" | "middle" | "lower"; when: "intro" | "shot" }, shotSeconds: number, font = "Poppins"): string {
+  const text = clean(o.text);
+  if (!text || shotSeconds <= 0.4) return "";
+  const safeFont = font.replace(/[,\n\r]/g, "").slice(0, 60) || "Poppins";
+  const start = 0.25;
+  const end = Math.max(start + 0.3, o.when === "shot" ? shotSeconds - 0.1 : Math.min(shotSeconds - 0.1, start + 3));
+  const align = OVERLAY_ALIGN[o.place];
+  const marginV = o.place === "lower" ? 230 : o.place === "top" ? 90 : 0;
+  const header = `[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Overlay,${safeFont},84,&H00FFFFFF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,0,0,1,6,3,${align},140,140,${marginV},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+  return `${header}Dialogue: 1,${stamp(start)},${stamp(Math.min(end, shotSeconds))},Overlay,,0,0,0,,{\\fad(300,300)}${text}\n`;
+}
